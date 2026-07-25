@@ -71,34 +71,38 @@ create function is_platform() returns boolean
 
 **Recursion guard:** `club_users` and `platform_users` each get their own SELECT policy that does **not** call these helpers — just `user_id = auth.uid()`. The helpers only avoid infinite recursion because they run as `SECURITY DEFINER`, bypassing RLS on the tables they query internally; if their own tables' policies called back into them, it would recurse.
 
-**Every tenant table** (`members`, `products`, `inventory_moves`, `donations`, `contract_templates`, `signed_contracts`):
+**Every tenant table** (`members`, `products`, `inventory_moves`, `donations`, `contract_templates`, `signed_contracts`) is **tenant-only, full stop — no platform bypass**:
 
 ```sql
--- SELECT: tenant members/staff/admins, plus read-only platform access
-using ( club_id in (select my_club_ids()) or (select is_platform()) )
-
--- INSERT/UPDATE/DELETE: tenant only — platform never writes tenant operational data
+-- SELECT / INSERT / UPDATE / DELETE: tenant only
 using ( club_id in (select my_club_ids()) )
 with check ( club_id in (select my_club_ids()) )
 ```
 
-Note the `(select my_club_ids())` / `(select is_platform())` wrapping in every policy — this makes Postgres evaluate the helper once per statement (cached in the query's init plan) rather than once per row.
+Platform never gets row-level access to any operational table. The README's Platform screen only shows a per-club table (name, plan, region, member count, MRR, status) plus 4 cross-tenant KPI cards — never individual member/product/inventory/donation/contract rows — so there is no screen that needs `is_platform()` as a row-level bypass anywhere. If a future screen genuinely needs cross-tenant row access to one of these tables, that's a deliberate spec change, not a default.
 
-`clubs`, `club_users`, `platform_users` are **not** writable by authenticated users at all under RLS (no INSERT/UPDATE/DELETE policies for the `authenticated` role). Onboarding a new club, inviting a club's first admin, or granting platform access all go through a **service-role server action** — an explicit, auditable privileged code path, not a database-level bypass rule. `clubs` gets a SELECT policy identical in shape to the tenant tables above (own club, or platform).
+What platform *does* get:
 
-**Storage:** a private `signatures` bucket, objects keyed by path `{club_id}/{member_id}/{signed_contract_id}.png`. Storage RLS policies parse the leading path segment as `club_id` and apply the same `my_club_ids()` / `is_platform()` logic.
+- **SELECT on `clubs`** (all rows): `using ( id in (select my_club_ids()) or (select is_platform()) )`. `clubs` carries no PII — name, slug, plan, region, status, mrr — so this is fine as a row-level policy.
+- **A `platform_club_stats` reporting view/RPC** — `SECURITY DEFINER`, returns `club_id, member_count` (and any other aggregate the KPI cards need, e.g. totals) by counting `members` internally, bypassing that table's RLS. The function checks `is_platform()` itself and returns nothing (or raises) for non-platform callers, so it's safe to expose via a plain `grant execute` rather than needing its own RLS. This is the *only* path from platform to member-derived data, and it never returns a row identifiable to an individual member — just a count.
+
+`is_platform()` therefore has exactly two call sites in the whole schema: the `clubs` SELECT policy, and inside `platform_club_stats`. It does not appear in any tenant table's policy.
+
+`clubs`, `club_users`, `platform_users` are **not** writable by authenticated users at all under RLS (no INSERT/UPDATE/DELETE policies for the `authenticated` role). Onboarding a new club, inviting a club's first admin, or granting platform access all go through a **service-role server action** — an explicit, auditable privileged code path, not a database-level bypass rule.
+
+**Storage:** a private `signatures` bucket, objects keyed by path `{club_id}/{member_id}/{signed_contract_id}.png`. Storage RLS policies parse the leading path segment as `club_id` and check `my_club_ids()` only — no platform bypass, matching `members`/`signed_contracts` above (a signature image is PII-adjacent in the same way the member row is).
 
 ## Phase 1 exit criteria — the tenant-isolation proof
 
 A Vitest suite, run before any further phase starts:
 
-1. Seed two clubs and their `contract_templates` via the service-role admin client.
+1. Seed two clubs and their `contract_templates` via the service-role admin client, with at least one member, product, inventory move, donation, and signed contract (incl. a Storage-uploaded signature) in each club.
 2. Create two auth users via the admin API, each with a `club_users` row (`role='admin'`) in a different club.
 3. Create one auth user with a `platform_users` row and no `club_users` row.
 4. Sign in as each club user via the anon client (real password auth, not service role).
-5. For every tenant table and the Storage bucket: as Club A's user, attempt SELECT/INSERT/UPDATE/DELETE scoped to Club B's ids (including guessed/enumerated ids) — assert empty result sets / permission-denied, never Club B's data.
-6. As the platform user: confirm SELECT across both clubs' tenant tables succeeds (read-only), and confirm INSERT/UPDATE/DELETE against tenant tables is rejected even for the platform user.
-7. As a plain club user: confirm no access to platform-only data.
+5. For every tenant table (`members`, `products`, `inventory_moves`, `donations`, `contract_templates`, `signed_contracts`) and the Storage bucket: as Club A's user, attempt SELECT/INSERT/UPDATE/DELETE scoped to Club B's ids (including guessed/enumerated ids) — assert empty result sets / permission-denied, never Club B's data.
+6. As the platform user: confirm SELECT on `clubs` returns both clubs, and `platform_club_stats` returns correct aggregate counts for both — but row-level SELECT against `members`, `products`, `inventory_moves`, `donations`, `contract_templates`, `signed_contracts`, and the Storage bucket all return empty/denied for both clubs. Platform is aggregate-only, never a row-level read path onto operational data.
+7. As a plain club user: confirm no access to `platform_club_stats` and no visibility of the other club's row in `clubs`.
 
 This suite must be green before phase 2 begins.
 
