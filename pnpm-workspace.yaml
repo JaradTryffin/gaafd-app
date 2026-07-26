@@ -1,3 +1,13 @@
-ignoredBuiltDependencies:
-  - sharp
-  - unrs-resolver
+# Next.js 16 was published within pnpm 11's default minimumReleaseAge
+# supply-chain window (blocks installing packages published too recently,
+# to reduce exposure to compromised/typosquatted releases). This project
+# deliberately tracks Next.js "latest" per the design spec, so the check
+# is disabled here rather than globally for this user.
+minimumReleaseAge: 0
+
+# sharp (Next.js image optimization) and unrs-resolver (ESLint's
+# TypeScript resolver) are well-known packages with native postinstall
+# build scripts; approved so those binaries actually get built.
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
