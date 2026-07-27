@@ -8,6 +8,7 @@ export type ClubContextValue = {
   name: string;
   initials: string;
   accentColor: string;
+  plan: string;
   role: "staff" | "admin";
 };
 

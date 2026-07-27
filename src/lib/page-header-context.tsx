@@ -5,6 +5,11 @@ import { createContext, useContext, useEffect, useState } from "react";
 export type PageHeaderValue = {
   title: string;
   subtitle?: string;
+  // A new element on every render of the calling page re-fires the effect
+  // below (React compares by identity), which is fine and expected if the
+  // content is genuinely live (e.g. reflecting a controlled search input's
+  // value). If a page's actions are static, wrap them in useMemo so an
+  // unrelated re-render of that page doesn't churn the shared header.
   actions?: React.ReactNode;
 };
 

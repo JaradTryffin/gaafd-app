@@ -78,6 +78,7 @@ export function Sidebar({
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-[12.5px] font-semibold text-white">{club.name}</div>
+              <div className="text-[10.5px] text-[#8a9182]">{club.plan} plan</div>
             </div>
             <div className="text-[11px] text-[#8a9182]">▾</div>
           </button>
@@ -139,7 +140,7 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="flex items-center gap-2.5 border-t border-[#262c22] p-3">
+      <div className="flex items-center gap-2.5 border-t border-sidebar-border-dark p-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">
           {club.role === "admin" ? "AD" : "ST"}
         </div>

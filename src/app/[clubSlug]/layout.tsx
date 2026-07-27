@@ -39,6 +39,7 @@ export default async function ClubLayout({
         name: access.name,
         initials: access.initials,
         accentColor: access.accentColor,
+        plan: access.plan,
         role: access.role,
       }}
     >

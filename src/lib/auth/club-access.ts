@@ -6,6 +6,7 @@ export type ClubAccess = {
   name: string;
   initials: string;
   accentColor: string;
+  plan: string;
   role: "staff" | "admin";
 };
 
@@ -22,7 +23,7 @@ export async function resolveClubAccess(
   // club they don't belong to comes back empty here, not as a leaked row.
   const { data: club, error: clubError } = await supabase
     .from("clubs")
-    .select("id, slug, name, initials, accent_color")
+    .select("id, slug, name, initials, accent_color, plan")
     .eq("slug", slug)
     .maybeSingle();
   if (clubError || !club) return null;
@@ -43,6 +44,7 @@ export async function resolveClubAccess(
     name: club.name,
     initials: club.initials,
     accentColor: club.accent_color,
+    plan: club.plan,
     role: membership.role as "staff" | "admin",
   };
 }
