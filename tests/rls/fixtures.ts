@@ -207,17 +207,36 @@ export async function seedTenants(): Promise<SeededData> {
 
 export async function cleanupTenants(data: SeededData): Promise<void> {
   const admin = createAdminClient();
+  const errors: unknown[] = [];
 
-  await admin.storage
+  const { error: storageError } = await admin.storage
     .from("signatures")
     .remove([data.clubA.signaturePath, data.clubB.signaturePath]);
+  if (storageError) errors.push(storageError);
+
   // Deleting the clubs cascades to club_users, members, products,
   // inventory_moves, donations, contract_templates, signed_contracts —
   // every one of those FKs is `on delete cascade`.
-  await admin.from("clubs").delete().in("id", [data.clubA.clubId, data.clubB.clubId]);
-  await admin.auth.admin.deleteUser(data.clubA.adminUserId);
-  await admin.auth.admin.deleteUser(data.clubB.adminUserId);
-  await admin.auth.admin.deleteUser(data.platformUserId);
+  const { error: clubsError } = await admin
+    .from("clubs")
+    .delete()
+    .in("id", [data.clubA.clubId, data.clubB.clubId]);
+  if (clubsError) errors.push(clubsError);
+
+  const { error: adminAError } = await admin.auth.admin.deleteUser(data.clubA.adminUserId);
+  if (adminAError) errors.push(adminAError);
+
+  const { error: adminBError } = await admin.auth.admin.deleteUser(data.clubB.adminUserId);
+  if (adminBError) errors.push(adminBError);
+
+  const { error: platformError } = await admin.auth.admin.deleteUser(data.platformUserId);
+  if (platformError) errors.push(platformError);
+
+  if (errors.length > 0) {
+    throw new Error(
+      `cleanupTenants: ${errors.length} step(s) failed: ${errors.map((e) => String(e)).join("; ")}`,
+    );
+  }
 }
 
 export async function signInAs(email: string, password: string): Promise<SupabaseClient> {

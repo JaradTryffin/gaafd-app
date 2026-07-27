@@ -9,7 +9,9 @@ beforeAll(async () => {
 }, 30000);
 
 afterAll(async () => {
-  await cleanupTenants(data);
+  if (data) {
+    await cleanupTenants(data);
+  }
 }, 30000);
 
 describe("seedTenants", () => {
