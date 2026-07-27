@@ -1,19 +1,23 @@
 "use client";
 
 import { useClub } from "@/lib/club-context";
-import { signOut } from "@/lib/auth/actions";
+import { usePageHeader } from "@/lib/page-header-context";
 
-// Placeholder until phase 3 (app shell) and phase 5 (real Dashboard
-// screen) land. Proves auth + club resolution + context work end to end.
+// Placeholder until phase 5 builds the real Dashboard screen (KPI cards,
+// activity feed, low-stock alerts). Proves the shell — sidebar, header,
+// context — renders real per-page content correctly.
 export default function ClubIndexPage() {
   const club = useClub();
+  usePageHeader({
+    title: "Dashboard",
+    subtitle: `${club.name} · signed in as ${club.role}`,
+  });
+
   return (
-    <div style={{ maxWidth: 480, margin: "80px auto", fontFamily: "sans-serif" }}>
-      <h1>{club.name}</h1>
-      <p>Signed in as {club.role}. The real dashboard lands in a later phase.</p>
-      <form action={signOut}>
-        <button type="submit">Sign out</button>
-      </form>
+    <div className="rounded-card border border-border bg-card p-6">
+      <p className="text-sm text-[#6b6f66]">
+        The real dashboard (KPI cards, activity, low-stock alerts) lands in phase 5.
+      </p>
     </div>
   );
 }

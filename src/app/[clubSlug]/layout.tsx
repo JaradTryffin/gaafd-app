@@ -1,7 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { resolveClubAccess } from "@/lib/auth/club-access";
+import { resolveClubAccess, listUserClubs } from "@/lib/auth/club-access";
 import { ClubProvider } from "@/lib/club-context";
+import { ToastProvider } from "@/lib/toast-context";
+import { PageHeaderProvider } from "@/lib/page-header-context";
+import { Sidebar } from "@/components/app-shell/sidebar";
+import { AppHeader } from "@/components/app-shell/header";
 
 export default async function ClubLayout({
   children,
@@ -25,6 +29,8 @@ export default async function ClubLayout({
     notFound();
   }
 
+  const clubs = await listUserClubs(supabase);
+
   return (
     <ClubProvider
       value={{
@@ -36,7 +42,17 @@ export default async function ClubLayout({
         role: access.role,
       }}
     >
-      {children}
+      <ToastProvider>
+        <PageHeaderProvider>
+          <div className="flex h-screen w-full overflow-hidden font-sans text-[14px] leading-[1.45] text-foreground">
+            <Sidebar clubs={clubs} userEmail={user.email ?? ""} />
+            <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+              <AppHeader />
+              <div className="flex-1 overflow-y-auto px-7 py-6">{children}</div>
+            </main>
+          </div>
+        </PageHeaderProvider>
+      </ToastProvider>
     </ClubProvider>
   );
 }
