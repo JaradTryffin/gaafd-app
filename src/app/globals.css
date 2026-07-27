@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+  --font-heading: var(--font-bricolage);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -46,33 +46,55 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-card: var(--radius-card);
+
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-surface: var(--sidebar-surface);
+  --color-sidebar-border-dark: var(--sidebar-border-dark);
+  --color-sidebar-text: var(--sidebar-text);
+  --color-sidebar-text-muted: var(--sidebar-text-muted);
+  --color-sidebar-accent-dot: var(--sidebar-accent-dot);
+
+  --color-status-active-bg: var(--status-active-bg);
+  --color-status-active-fg: var(--status-active-fg);
+  --color-status-inactive-bg: var(--status-inactive-bg);
+  --color-status-inactive-fg: var(--status-inactive-fg);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --radius: 0.5625rem; /* 9px – buttons/inputs */
+  --radius-card: 0.875rem; /* 14px */
+
+  --background: #f7f6f1;
+  --foreground: #1c1e1a;
+
+  --card: #ffffff;
+  --card-foreground: #1c1e1a;
+
+  --popover: #ffffff;
+  --popover-foreground: #1c1e1a;
+
+  --primary: #2f5d3a;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f2f0e8;
+  --secondary-foreground: #4a4e45;
+
+  --muted: #faf9f4;
+  --muted-foreground: #8a8e83;
+
+  --accent: #eef2ec;
+  --accent-foreground: #2f5d3a;
+
+  --destructive: #b4432f;
+
+  --border: #e7e4db;
+  --input: #e0ddd3;
+  --ring: #3f7a4e;
+
+  /* shadcn's own sidebar-component tokens — unused (GaafD's sidebar below
+     uses distinctly-named --sidebar-bg/... tokens instead), left as
+     generated so a future shadcn Sidebar component would still work */
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -81,6 +103,49 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* shadcn's chart tokens — unused, left as generated */
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+
+  /* GaafD-specific tokens not covered by shadcn's base palette */
+  --sidebar-bg: #161a15;
+  --sidebar-surface: #20261e;
+  --sidebar-border-dark: #2e352b;
+  --sidebar-text: #d7dcd3;
+  --sidebar-text-muted: #6d7568;
+  --sidebar-accent-dot: #6fbf82;
+
+  --link: #3f7a4e;
+  --link-hover: #2f5d3a;
+
+  --text-secondary: #4a4e45;
+  --text-muted-2: #9a9e93;
+  --text-muted-3: #a29c8c;
+
+  --border-2: #e0ddd3;
+  --border-3: #f0eee6;
+  --border-4: #f4f2ea;
+  --border-dashed: #cfccbf;
+
+  --disabled-button: #e4e1d7;
+
+  --status-active-bg: #e7f0e8;
+  --status-active-fg: #2f6a3f;
+  --status-inactive-bg: #f0eee6;
+  --status-inactive-fg: #8a8e83;
+
+  --badge-warn-bg: #3a2318;
+  --badge-warn-fg: #e0996a;
+
+  --tenant-accent-1: #3f7a4e;
+  --tenant-accent-2: #8a6d3b;
+  --tenant-accent-3: #4a6b8a;
+  --tenant-accent-4: #7a4a6b;
+  --tenant-accent-5: #6b7a4a;
 }
 
 .dark {
@@ -123,6 +188,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: 14px;
+    line-height: 1.45;
   }
   html {
     @apply font-sans;
