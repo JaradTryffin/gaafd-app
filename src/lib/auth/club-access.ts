@@ -60,3 +60,37 @@ export async function resolvePlatformAccess(supabase: SupabaseClient): Promise<b
     .maybeSingle();
   return Boolean(platformRow);
 }
+
+export type ClubMembershipSummary = {
+  clubId: string;
+  slug: string;
+  name: string;
+  initials: string;
+  accentColor: string;
+  plan: string;
+};
+
+export async function listUserClubs(supabase: SupabaseClient): Promise<ClubMembershipSummary[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: memberships } = await supabase.from("club_users").select("club_id");
+  const clubIds = (memberships ?? []).map((m) => m.club_id);
+  if (clubIds.length === 0) return [];
+
+  const { data: clubs } = await supabase
+    .from("clubs")
+    .select("id, slug, name, initials, accent_color, plan")
+    .in("id", clubIds);
+
+  return (clubs ?? []).map((c) => ({
+    clubId: c.id,
+    slug: c.slug,
+    name: c.name,
+    initials: c.initials,
+    accentColor: c.accent_color,
+    plan: c.plan,
+  }));
+}

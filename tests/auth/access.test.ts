@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { seedTenants, cleanupTenants, signInAs, type SeededData } from "../rls/fixtures";
-import { resolveClubAccess, resolvePlatformAccess } from "@/lib/auth/club-access";
+import { resolveClubAccess, resolvePlatformAccess, listUserClubs } from "@/lib/auth/club-access";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 let data: SeededData;
 let clubAClient: SupabaseClient;
@@ -59,5 +60,40 @@ describe("resolvePlatformAccess", () => {
 
   it("returns false for a club admin", async () => {
     expect(await resolvePlatformAccess(clubAClient)).toBe(false);
+  });
+});
+
+describe("listUserClubs", () => {
+  it("returns exactly the caller's own club", async () => {
+    const clubs = await listUserClubs(clubAClient);
+    expect(clubs.map((c) => c.clubId)).toEqual([data.clubA.clubId]);
+  });
+
+  it("returns every club a multi-club owner belongs to", async () => {
+    const admin = createAdminClient();
+    const { error } = await admin.from("club_users").insert({
+      club_id: data.clubB.clubId,
+      user_id: data.clubA.adminUserId,
+      role: "admin",
+    });
+    if (error) throw error;
+
+    try {
+      const clubs = await listUserClubs(clubAClient);
+      expect(clubs.map((c) => c.clubId).sort()).toEqual(
+        [data.clubA.clubId, data.clubB.clubId].sort(),
+      );
+    } finally {
+      await admin
+        .from("club_users")
+        .delete()
+        .eq("club_id", data.clubB.clubId)
+        .eq("user_id", data.clubA.adminUserId);
+    }
+  });
+
+  it("returns an empty array for a platform-only caller", async () => {
+    const clubs = await listUserClubs(platformClient);
+    expect(clubs).toEqual([]);
   });
 });
