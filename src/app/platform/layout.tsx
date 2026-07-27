@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { resolvePlatformAccess } from "@/lib/auth/club-access";
 
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -11,12 +12,8 @@ export default async function PlatformLayout({ children }: { children: React.Rea
     redirect("/login");
   }
 
-  const { data: platformRow } = await supabase
-    .from("platform_users")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!platformRow) {
+  const hasAccess = await resolvePlatformAccess(supabase);
+  if (!hasAccess) {
     notFound();
   }
 

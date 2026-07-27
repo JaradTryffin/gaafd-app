@@ -1,6 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+let createdUserId: string | null = null;
+
+afterEach(async () => {
+  // Runs regardless of whether the test's own assertions passed or threw,
+  // so a failed expect() partway through doesn't leak a real auth user on
+  // the live project (unlike relying on cleanup at the end of the it body).
+  if (createdUserId) {
+    const admin = createAdminClient();
+    await admin.auth.admin.deleteUser(createdUserId);
+    createdUserId = null;
+  }
+});
 
 describe("accept-invite mechanism: verifyOtp redeems a real invite token", () => {
   it("a generated invite link's token can be redeemed, establishing a session", async () => {
@@ -17,6 +30,7 @@ describe("accept-invite mechanism: verifyOtp redeems a real invite token", () =>
       email,
     });
     if (linkError) throw linkError;
+    createdUserId = linkData.user.id;
 
     // Confirmed against node_modules/.pnpm/@supabase+auth-js@2.110.8's
     // GenerateLinkProperties type: the field is `hashed_token`.
@@ -34,9 +48,5 @@ describe("accept-invite mechanism: verifyOtp redeems a real invite token", () =>
     expect(verifyError).toBeNull();
     expect(verifyData.session).not.toBeNull();
     expect(verifyData.user?.email).toBe(email);
-
-    if (verifyData.user) {
-      await admin.auth.admin.deleteUser(verifyData.user.id);
-    }
   }, 30000);
 });

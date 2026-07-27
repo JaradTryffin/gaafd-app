@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { resolveClubAccess } from "@/lib/auth/club-access";
 import { ClubProvider } from "@/lib/club-context";
 
 export default async function ClubLayout({
@@ -19,38 +20,20 @@ export default async function ClubLayout({
     redirect("/login");
   }
 
-  // RLS already scopes this to clubs the caller can access — a slug for a
-  // club they don't belong to comes back empty here, not as a leaked row.
-  const { data: club, error: clubError } = await supabase
-    .from("clubs")
-    .select("id, slug, name, initials, accent_color")
-    .eq("slug", clubSlug)
-    .maybeSingle();
-  if (clubError || !club) {
-    notFound();
-  }
-
-  // This is the definitive authorization check (not just a formality) — it
-  // also gets us the role the rest of the app needs.
-  const { data: membership } = await supabase
-    .from("club_users")
-    .select("role")
-    .eq("club_id", club.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!membership) {
+  const access = await resolveClubAccess(supabase, clubSlug);
+  if (!access) {
     notFound();
   }
 
   return (
     <ClubProvider
       value={{
-        clubId: club.id,
-        slug: club.slug,
-        name: club.name,
-        initials: club.initials,
-        accentColor: club.accent_color,
-        role: membership.role as "staff" | "admin",
+        clubId: access.clubId,
+        slug: access.slug,
+        name: access.name,
+        initials: access.initials,
+        accentColor: access.accentColor,
+        role: access.role,
       }}
     >
       {children}

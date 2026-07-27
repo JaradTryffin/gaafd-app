@@ -6,7 +6,15 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/accept-invite/set-password";
+  const requestedNext = searchParams.get("next");
+  // Only allow same-site relative paths — "next" comes from the URL, and
+  // redirect() would otherwise honor an absolute or protocol-relative
+  // target (open redirect). Reaching this branch already requires a valid
+  // token_hash+type, but there's no reason to trust "next" beyond that.
+  const next =
+    requestedNext && requestedNext.startsWith("/") && !requestedNext.startsWith("//")
+      ? requestedNext
+      : "/accept-invite/set-password";
 
   if (token_hash && type) {
     const supabase = await createClient();
