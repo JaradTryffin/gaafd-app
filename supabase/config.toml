@@ -234,8 +234,8 @@ otp_expiry = 3600
 # (needed before phase 4/5's invite emails can reach real people, not just
 # for tests). Until then, Supabase's built-in provider (~2 emails/hour) is
 # the fallback — see supabase/config.toml's [auth.rate_limit] email_sent.
-# [auth.email.smtp]
-# enabled = true
+[auth.email.smtp]
+enabled = false
 # host = "smtp.resend.com"
 # port = 587
 # user = "resend"
