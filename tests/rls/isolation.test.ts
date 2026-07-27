@@ -203,6 +203,94 @@ describe("cross-club isolation: cannot write into the other club's tenant tables
   });
 });
 
+describe("cross-club isolation: cannot insert into the other club's append-only tables", () => {
+  for (const dir of directions) {
+    it(`${dir.label}: insert into inventory_moves scoped to the other club is rejected`, async () => {
+      const { error } = await dir.client().from("inventory_moves").insert({
+        club_id: dir.other().clubId,
+        product_id: dir.other().productId,
+        type: "ADJUSTMENT",
+        qty: 1,
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it(`${dir.label}: insert into signed_contracts scoped to the other club is rejected`, async () => {
+      const { error } = await dir.client().from("signed_contracts").insert({
+        club_id: dir.other().clubId,
+        member_id: dir.other().memberId,
+        template_version: 1,
+        contract_snapshot: { title: "Intruder" },
+        consent: true,
+        signature_url: "intruder.png",
+      });
+      expect(error).not.toBeNull();
+    });
+  }
+});
+
+describe("append-only enforcement: not even the owning club can mutate audit tables", () => {
+  // With RLS enabled and zero policies defined for a given command, that
+  // command is denied for everyone. Depending on how PostgREST surfaces
+  // that (a thrown error, vs. a USING-style silent zero-row match like the
+  // cross-club UPDATE/DELETE tests above), the denial could show up either
+  // way — so these assert the property that actually matters (no row came
+  // back) rather than guessing which representation Postgres chooses. The
+  // "still unchanged" check below is the final, unambiguous proof.
+  it("Club A cannot update its own inventory_moves row", async () => {
+    const { data: rows } = await clubAClient
+      .from("inventory_moves")
+      .update({ qty: 999 })
+      .eq("id", data.clubA.inventoryMoveId)
+      .select();
+    expect(rows ?? []).toEqual([]);
+  });
+
+  it("Club A cannot delete its own inventory_moves row", async () => {
+    const { data: rows } = await clubAClient
+      .from("inventory_moves")
+      .delete()
+      .eq("id", data.clubA.inventoryMoveId)
+      .select();
+    expect(rows ?? []).toEqual([]);
+  });
+
+  it("Club A cannot update its own signed_contracts row", async () => {
+    const { data: rows } = await clubAClient
+      .from("signed_contracts")
+      .update({ consent: false })
+      .eq("id", data.clubA.signedContractId)
+      .select();
+    expect(rows ?? []).toEqual([]);
+  });
+
+  it("Club A cannot delete its own signed_contracts row", async () => {
+    const { data: rows } = await clubAClient
+      .from("signed_contracts")
+      .delete()
+      .eq("id", data.clubA.signedContractId)
+      .select();
+    expect(rows ?? []).toEqual([]);
+  });
+
+  it("Club A's inventory_moves and signed_contracts rows are still unchanged", async () => {
+    const admin = createAdminClient();
+    const { data: move } = await admin
+      .from("inventory_moves")
+      .select("id, qty")
+      .eq("id", data.clubA.inventoryMoveId)
+      .single();
+    expect(move?.qty).toBe(100);
+
+    const { data: contract } = await admin
+      .from("signed_contracts")
+      .select("id, consent")
+      .eq("id", data.clubA.signedContractId)
+      .single();
+    expect(contract?.consent).toBe(true);
+  });
+});
+
 describe("cross-club isolation: guessed/enumerated ids", () => {
   for (const dir of directions) {
     it(`${dir.label}: cannot fetch the other club's signed contract by guessing its id`, async () => {
