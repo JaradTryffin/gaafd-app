@@ -22,5 +22,15 @@ export function safeRedirectPath(candidate: string | null): string {
   // Rebuild from parsed parts only — never pass the original string or
   // resolved.href through, so nothing the parser didn't put in pathname/
   // search/hash can smuggle an authority back in.
-  return resolved.pathname + resolved.search + resolved.hash;
+  const rebuilt = resolved.pathname + resolved.search + resolved.hash;
+
+  // The origin check above isn't sufficient on its own: a dot-segment
+  // combined with a backslash (e.g. "/../\evil.com") normalizes to a
+  // pathname of "//evil.com" while resolved.origin still reports
+  // "http://localhost" — the origin check passes, but the REBUILT string
+  // is itself protocol-relative and unsafe to hand to a browser as a bare
+  // redirect target. Reject the output, not just the intermediate parse.
+  if (rebuilt.startsWith("//") || rebuilt.startsWith("/\\")) return FALLBACK;
+
+  return rebuilt;
 }

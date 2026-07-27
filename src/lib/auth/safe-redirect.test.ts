@@ -35,6 +35,18 @@ describe("safeRedirectPath", () => {
     expect(safeRedirectPath("/\\/evil.com")).toBe("/accept-invite/set-password");
   });
 
+  it("rejects the dot-segment + backslash bypass (origin check alone misses this)", () => {
+    // "/../\evil.com" normalizes to a pathname of "//evil.com" — origin
+    // still reports as the app's own origin (the dot-segment collapses
+    // back to root before the backslash-as-separator takes effect), but
+    // the REBUILT string itself is protocol-relative. Caught by validating
+    // rebuilt.startsWith("//"), not just resolved.origin.
+    expect(safeRedirectPath("/../\\evil.com")).toBe("/accept-invite/set-password");
+    expect(safeRedirectPath("/../\\/evil.com")).toBe("/accept-invite/set-password");
+    expect(safeRedirectPath("/a/../\\evil.com")).toBe("/accept-invite/set-password");
+    expect(safeRedirectPath("/../\\evil.com/x")).toBe("/accept-invite/set-password");
+  });
+
   it("treats a schemeless bare word as a same-site relative path, not a host", () => {
     // No leading slash means the URL parser resolves it as a path segment
     // on the current origin (e.g. "evil.com" -> "/evil.com"), not a host —
