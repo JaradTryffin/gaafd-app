@@ -227,14 +227,21 @@ otp_length = 6
 otp_expiry = 3600
 
 # Use a production-ready SMTP server
+# Resend is set up (RESEND_API_KEY in .env.local) but disabled here: its
+# unverified sandbox sender (onboarding@resend.dev) can only send to the
+# Resend account's own signup email, not arbitrary recipients — useless for
+# real invites. Re-enable once a domain is verified at resend.com/domains
+# (needed before phase 4/5's invite emails can reach real people, not just
+# for tests). Until then, Supabase's built-in provider (~2 emails/hour) is
+# the fallback — see supabase/config.toml's [auth.rate_limit] email_sent.
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
+# host = "smtp.resend.com"
 # port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# user = "resend"
+# pass = "env(RESEND_API_KEY)"
+# admin_email = "onboarding@resend.dev"
+# sender_name = "GaafD"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
