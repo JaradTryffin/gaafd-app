@@ -1,0 +1,26 @@
+const FALLBACK = "/accept-invite/set-password";
+
+// Restricts a redirect target to a same-site relative path. Using the URL
+// parser (rather than string prefix checks like startsWith("/")) matters:
+// browsers normalize backslashes to slashes when resolving protocol-relative
+// URLs for special schemes, so "/\evil.com" is NOT caught by
+// startsWith("//") but IS treated as "//evil.com" (a different origin) once
+// actually parsed — using URL here applies the same normalization the
+// browser will, instead of a hand-rolled check that can miss it.
+export function safeRedirectPath(candidate: string | null): string {
+  if (!candidate) return FALLBACK;
+
+  let resolved: URL;
+  try {
+    resolved = new URL(candidate, "http://localhost");
+  } catch {
+    return FALLBACK;
+  }
+
+  if (resolved.origin !== "http://localhost") return FALLBACK;
+
+  // Rebuild from parsed parts only — never pass the original string or
+  // resolved.href through, so nothing the parser didn't put in pathname/
+  // search/hash can smuggle an authority back in.
+  return resolved.pathname + resolved.search + resolved.hash;
+}

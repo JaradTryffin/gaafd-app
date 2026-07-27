@@ -1,20 +1,13 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { safeRedirectPath } from "@/lib/auth/safe-redirect";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const requestedNext = searchParams.get("next");
-  // Only allow same-site relative paths — "next" comes from the URL, and
-  // redirect() would otherwise honor an absolute or protocol-relative
-  // target (open redirect). Reaching this branch already requires a valid
-  // token_hash+type, but there's no reason to trust "next" beyond that.
-  const next =
-    requestedNext && requestedNext.startsWith("/") && !requestedNext.startsWith("//")
-      ? requestedNext
-      : "/accept-invite/set-password";
+  const next = safeRedirectPath(searchParams.get("next"));
 
   if (token_hash && type) {
     const supabase = await createClient();
