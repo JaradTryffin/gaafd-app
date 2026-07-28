@@ -249,6 +249,12 @@ describe("registerMember with ID photos", () => {
     const path = `${data.clubA.clubId}/${memberId}/front.png`;
     cleanupIdPhotoPaths.push(path);
 
+    // Positive baseline first: club A's own client can read it — so the
+    // negative check below is a real RLS denial, not an unrelated failure
+    // (wrong bucket name, auth issue) masquerading as one.
+    const { error: sameClubError } = await clubAClient.storage.from("member-ids").download(path);
+    expect(sameClubError).toBeNull();
+
     const { error } = await clubBClient.storage.from("member-ids").download(path);
     expect(error).not.toBeNull();
   });
