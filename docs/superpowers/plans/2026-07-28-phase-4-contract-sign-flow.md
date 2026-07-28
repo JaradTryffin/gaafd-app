@@ -810,8 +810,11 @@ export function RegisterMemberForm({
         </p>
         <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-3.5">
           <div>
-            <label className="mb-1 block text-[11px] text-[#8a8e83]">First name *</label>
+            <label htmlFor="first" className="mb-1 block text-[11px] text-[#8a8e83]">
+              First name *
+            </label>
             <input
+              id="first"
               required
               value={first}
               onChange={(e) => setFirst(e.target.value)}
@@ -820,8 +823,11 @@ export function RegisterMemberForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[#8a8e83]">Last name *</label>
+            <label htmlFor="last" className="mb-1 block text-[11px] text-[#8a8e83]">
+              Last name *
+            </label>
             <input
+              id="last"
               required
               value={last}
               onChange={(e) => setLast(e.target.value)}
@@ -830,8 +836,11 @@ export function RegisterMemberForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[#8a8e83]">Email (optional)</label>
+            <label htmlFor="email" className="mb-1 block text-[11px] text-[#8a8e83]">
+              Email (optional)
+            </label>
             <input
+              id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -840,8 +849,11 @@ export function RegisterMemberForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[#8a8e83]">Phone (optional)</label>
+            <label htmlFor="phone" className="mb-1 block text-[11px] text-[#8a8e83]">
+              Phone (optional)
+            </label>
             <input
+              id="phone"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+27…"
@@ -849,8 +861,11 @@ export function RegisterMemberForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[#8a8e83]">Membership type</label>
+            <label htmlFor="type" className="mb-1 block text-[11px] text-[#8a8e83]">
+              Membership type
+            </label>
             <select
+              id="type"
               value={type}
               onChange={(e) => setType(e.target.value)}
               className="w-full rounded-[9px] border border-input bg-card px-3 py-2.5 text-[13px]"
@@ -861,8 +876,11 @@ export function RegisterMemberForm({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[#8a8e83]">Referred by (optional)</label>
+            <label htmlFor="referrer" className="mb-1 block text-[11px] text-[#8a8e83]">
+              Referred by (optional)
+            </label>
             <select
+              id="referrer"
               value={referrerId}
               onChange={(e) => setReferrerId(e.target.value)}
               className="w-full rounded-[9px] border border-input bg-card px-3 py-2.5 text-[13px]"
@@ -876,10 +894,11 @@ export function RegisterMemberForm({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[#8a8e83]">
+            <label htmlFor="appHandle" className="mb-1 block text-[11px] text-[#8a8e83]">
               Linked app username (optional)
             </label>
             <input
+              id="appHandle"
               value={appHandle}
               onChange={(e) => setAppHandle(e.target.value)}
               placeholder="@username"
@@ -887,8 +906,11 @@ export function RegisterMemberForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[#8a8e83]">Initial status</label>
+            <label htmlFor="status" className="mb-1 block text-[11px] text-[#8a8e83]">
+              Initial status
+            </label>
             <select
+              id="status"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               className="w-full rounded-[9px] border border-input bg-card px-3 py-2.5 text-[13px]"
@@ -1238,10 +1260,11 @@ export function SignAgreementForm({
 
           <div className="mt-4 grid grid-cols-[1.4fr_1fr] gap-3.5">
             <div>
-              <label className="mb-1 block text-[11px] text-[#8a8e83]">
+              <label htmlFor="printedName" className="mb-1 block text-[11px] text-[#8a8e83]">
                 Printed name (optional)
               </label>
               <input
+                id="printedName"
                 value={printedName}
                 onChange={(e) => setPrintedName(e.target.value)}
                 placeholder="Member's name for records"
@@ -1249,8 +1272,11 @@ export function SignAgreementForm({
               />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] text-[#8a8e83]">Date</label>
+              <label htmlFor="signDate" className="mb-1 block text-[11px] text-[#8a8e83]">
+                Date
+              </label>
               <input
+                id="signDate"
                 value={signDate}
                 readOnly
                 className="w-full rounded-[9px] border border-input bg-muted px-3 py-2.5 font-mono text-[13px] text-[#6b6f66]"
@@ -1619,14 +1645,20 @@ export function ContractEditor({ initialTemplate }: { initialTemplate: ContractT
         </div>
         <p className="mb-4 text-[12.5px] text-[#6b6f66]">Each club maintains its own version.</p>
 
-        <label className="mb-1 block text-[11px] text-[#8a8e83]">Agreement title</label>
+        <label htmlFor="contractTitle" className="mb-1 block text-[11px] text-[#8a8e83]">
+          Agreement title
+        </label>
         <input
+          id="contractTitle"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="mb-3 w-full rounded-[9px] border border-input px-3 py-2.5 text-[13px]"
         />
-        <label className="mb-1 block text-[11px] text-[#8a8e83]">Subtitle / preamble</label>
+        <label htmlFor="contractSubtitle" className="mb-1 block text-[11px] text-[#8a8e83]">
+          Subtitle / preamble
+        </label>
         <textarea
+          id="contractSubtitle"
           value={subtitle}
           onChange={(e) => setSubtitle(e.target.value)}
           rows={2}
@@ -1647,6 +1679,7 @@ export function ContractEditor({ initialTemplate }: { initialTemplate: ContractT
                 value={clause.heading}
                 onChange={(e) => updateClause(index, "heading", e.target.value)}
                 placeholder="Clause heading"
+                aria-label={`Clause ${index + 1} heading`}
                 className="min-w-0 flex-1 rounded-[7px] border border-input bg-card px-2.5 py-1.5 text-[12.5px] font-semibold"
               />
               <button
@@ -1678,6 +1711,7 @@ export function ContractEditor({ initialTemplate }: { initialTemplate: ContractT
               value={clause.body}
               onChange={(e) => updateClause(index, "body", e.target.value)}
               placeholder="Clause text…"
+              aria-label={`Clause ${index + 1} body`}
               rows={3}
               className="w-full rounded-[7px] border border-input bg-card px-2.5 py-2 text-[12.5px] leading-relaxed"
             />
@@ -1691,10 +1725,11 @@ export function ContractEditor({ initialTemplate }: { initialTemplate: ContractT
           + Add clause
         </button>
 
-        <label className="mb-1 mt-4 block text-[11px] text-[#8a8e83]">
+        <label htmlFor="contractConsent" className="mb-1 mt-4 block text-[11px] text-[#8a8e83]">
           Consent statement (shown beside the signature checkbox)
         </label>
         <textarea
+          id="contractConsent"
           value={consent}
           onChange={(e) => setConsent(e.target.value)}
           rows={2}
