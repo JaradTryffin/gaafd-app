@@ -182,3 +182,76 @@ export async function resetContractTemplate(
   const seed = defaultContract(clubName);
   return saveContractTemplate(supabase, clubId, seed);
 }
+
+export type SignContractInput = {
+  clubId: string;
+  clubName: string;
+  memberId: string;
+  printedName: string;
+  consent: boolean;
+  signaturePngBase64: string;
+};
+
+export async function signContract(
+  supabase: SupabaseClient,
+  input: SignContractInput,
+): Promise<{ signedContractId: string }> {
+  if (!input.consent) {
+    throw new Error("Consent is required to sign");
+  }
+
+  const base64 = input.signaturePngBase64.replace(/^data:image\/png;base64,/, "");
+  const bytes = Buffer.from(base64, "base64");
+  if (bytes.length === 0) {
+    throw new Error("A signature is required to sign");
+  }
+
+  // Defense-in-depth: RLS's signed_contracts INSERT policy only checks
+  // that the NEW row's club_id belongs to the caller — it doesn't verify
+  // member_id actually belongs to that same club. Check explicitly so a
+  // bug can't create a record linking one club's data to another club's
+  // member.
+  const { data: member, error: memberError } = await supabase
+    .from("members")
+    .select("id")
+    .eq("id", input.memberId)
+    .eq("club_id", input.clubId)
+    .maybeSingle();
+  if (memberError) throw memberError;
+  if (!member) {
+    throw new Error("Member not found in this club");
+  }
+
+  const template = await getOrCreateContractTemplate(supabase, input.clubId, input.clubName);
+
+  // Generated client-side, not the DB default, because the Storage path
+  // needs this id BEFORE the row exists, and signed_contracts is
+  // append-only (no UPDATE policy) — "insert then patch signature_url"
+  // is not possible.
+  const signedContractId = crypto.randomUUID();
+  const signaturePath = `${input.clubId}/${input.memberId}/${signedContractId}.png`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("signatures")
+    .upload(signaturePath, bytes, { contentType: "image/png" });
+  if (uploadError) throw uploadError;
+
+  const { error: insertError } = await supabase.from("signed_contracts").insert({
+    id: signedContractId,
+    club_id: input.clubId,
+    member_id: input.memberId,
+    template_version: template.version,
+    contract_snapshot: {
+      title: template.title,
+      subtitle: template.subtitle,
+      consent: template.consent,
+      clauses: template.clauses,
+    },
+    consent: input.consent,
+    printed_name: input.printedName || null,
+    signature_url: signaturePath,
+  });
+  if (insertError) throw insertError;
+
+  return { signedContractId };
+}
