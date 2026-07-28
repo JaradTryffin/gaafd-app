@@ -197,8 +197,8 @@ describe("registerMember with ID photos", () => {
       idBack,
     });
     cleanupMemberIds.push(memberId);
-    const frontPath = `${data.clubA.clubId}/${memberId}/front.png`;
-    const backPath = `${data.clubA.clubId}/${memberId}/back.png`;
+    const frontPath = `${data.clubA.clubId}/${memberId}/front`;
+    const backPath = `${data.clubA.clubId}/${memberId}/back`;
     cleanupIdPhotoPaths.push(frontPath, backPath);
 
     const admin = createAdminClient();
@@ -246,7 +246,7 @@ describe("registerMember with ID photos", () => {
       idFront,
     });
     cleanupMemberIds.push(memberId);
-    const path = `${data.clubA.clubId}/${memberId}/front.png`;
+    const path = `${data.clubA.clubId}/${memberId}/front`;
     cleanupIdPhotoPaths.push(path);
 
     // Positive baseline first: club A's own client can read it — so the

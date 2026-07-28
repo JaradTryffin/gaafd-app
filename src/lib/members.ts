@@ -38,12 +38,6 @@ async function nextMemberCode(supabase: SupabaseClient, clubId: string): Promise
   return `${club.initials}-${String(maxSequence + 1).padStart(4, "0")}`;
 }
 
-function extensionForFile(file: File): string {
-  if (file.type === "image/png") return "png";
-  if (file.type === "image/heic" || file.type === "image/heif") return "heic";
-  return "jpg";
-}
-
 async function uploadIdPhoto(
   supabase: SupabaseClient,
   clubId: string,
@@ -51,7 +45,7 @@ async function uploadIdPhoto(
   side: "front" | "back",
   file: File,
 ): Promise<string | null> {
-  const path = `${clubId}/${memberId}/${side}.${extensionForFile(file)}`;
+  const path = `${clubId}/${memberId}/${side}`;
   const { error } = await supabase.storage
     .from("member-ids")
     .upload(path, file, { contentType: file.type || "image/jpeg", upsert: true });
@@ -87,23 +81,30 @@ export async function registerMember(
       .single();
     if (!error) {
       const memberId = data.id as string;
-      const updates: { id_front_url?: string; id_back_url?: string } = {};
-      if (input.idFront) {
-        const path = await uploadIdPhoto(supabase, input.clubId, memberId, "front", input.idFront);
-        if (path) updates.id_front_url = path;
-      }
-      if (input.idBack) {
-        const path = await uploadIdPhoto(supabase, input.clubId, memberId, "back", input.idBack);
-        if (path) updates.id_back_url = path;
-      }
-      if (Object.keys(updates).length > 0) {
-        const { error: updateError } = await supabase
-          .from("members")
-          .update(updates)
-          .eq("id", memberId);
-        if (updateError) {
-          console.error(`Failed to save ID photo path(s) for member ${memberId}:`, updateError);
+      try {
+        const updates: { id_front_url?: string; id_back_url?: string } = {};
+        if (input.idFront) {
+          const path = await uploadIdPhoto(supabase, input.clubId, memberId, "front", input.idFront);
+          if (path) updates.id_front_url = path;
         }
+        if (input.idBack) {
+          const path = await uploadIdPhoto(supabase, input.clubId, memberId, "back", input.idBack);
+          if (path) updates.id_back_url = path;
+        }
+        if (Object.keys(updates).length > 0) {
+          const { error: updateError } = await supabase
+            .from("members")
+            .update(updates)
+            .eq("id", memberId);
+          if (updateError) {
+            console.error(`Failed to save ID photo path(s) for member ${memberId}:`, updateError);
+          }
+        }
+      } catch (photoErr) {
+        // Photos are best-effort — an unexpected throw here (as opposed to
+        // uploadIdPhoto's own handled error-object case) must still never
+        // fail a real registration.
+        console.error(`Unexpected error saving ID photo(s) for member ${memberId}:`, photoErr);
       }
       return { memberId, code: data.code as string };
     }
