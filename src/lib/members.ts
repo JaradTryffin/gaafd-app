@@ -73,3 +73,42 @@ export async function registerMember(
   }
   throw new Error("Failed to generate a unique member code after multiple attempts");
 }
+
+export type MemberListRow = {
+  id: string;
+  first: string;
+  last: string;
+  code: string;
+  type: "Full member" | "Day pass" | "Trial";
+  tokenBalance: number;
+  referrerName: string | null;
+  status: "active" | "inactive";
+};
+
+export async function listMembers(
+  supabase: SupabaseClient,
+  clubId: string,
+): Promise<MemberListRow[]> {
+  const { data, error } = await supabase
+    .from("members")
+    .select("id, first, last, code, type, token_balance, referrer_id, status")
+    .eq("club_id", clubId)
+    .order("joined_at", { ascending: false });
+  if (error) throw error;
+
+  const rows = data ?? [];
+  // A referrer is always another member of the same club, already present
+  // in this same result set — no second query needed.
+  const nameById = new Map(rows.map((m) => [m.id as string, `${m.first} ${m.last}`]));
+
+  return rows.map((m) => ({
+    id: m.id as string,
+    first: m.first as string,
+    last: m.last as string,
+    code: m.code as string,
+    type: m.type as "Full member" | "Day pass" | "Trial",
+    tokenBalance: m.token_balance as number,
+    referrerName: m.referrer_id ? (nameById.get(m.referrer_id as string) ?? null) : null,
+    status: m.status as "active" | "inactive",
+  }));
+}
