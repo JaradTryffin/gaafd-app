@@ -10,6 +10,8 @@ export type RegisterMemberInput = {
   email?: string;
   appHandle?: string;
   referrerId?: string;
+  idFront?: File | null;
+  idBack?: File | null;
 };
 
 async function nextMemberCode(supabase: SupabaseClient, clubId: string): Promise<string> {
@@ -36,6 +38,30 @@ async function nextMemberCode(supabase: SupabaseClient, clubId: string): Promise
   return `${club.initials}-${String(maxSequence + 1).padStart(4, "0")}`;
 }
 
+function extensionForFile(file: File): string {
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/heic" || file.type === "image/heif") return "heic";
+  return "jpg";
+}
+
+async function uploadIdPhoto(
+  supabase: SupabaseClient,
+  clubId: string,
+  memberId: string,
+  side: "front" | "back",
+  file: File,
+): Promise<string | null> {
+  const path = `${clubId}/${memberId}/${side}.${extensionForFile(file)}`;
+  const { error } = await supabase.storage
+    .from("member-ids")
+    .upload(path, file, { contentType: file.type || "image/jpeg", upsert: true });
+  if (error) {
+    console.error(`Failed to upload ID ${side} photo for member ${memberId}:`, error);
+    return null;
+  }
+  return path;
+}
+
 export async function registerMember(
   supabase: SupabaseClient,
   input: RegisterMemberInput,
@@ -60,7 +86,26 @@ export async function registerMember(
       .select("id, code")
       .single();
     if (!error) {
-      return { memberId: data.id, code: data.code };
+      const memberId = data.id as string;
+      const updates: { id_front_url?: string; id_back_url?: string } = {};
+      if (input.idFront) {
+        const path = await uploadIdPhoto(supabase, input.clubId, memberId, "front", input.idFront);
+        if (path) updates.id_front_url = path;
+      }
+      if (input.idBack) {
+        const path = await uploadIdPhoto(supabase, input.clubId, memberId, "back", input.idBack);
+        if (path) updates.id_back_url = path;
+      }
+      if (Object.keys(updates).length > 0) {
+        const { error: updateError } = await supabase
+          .from("members")
+          .update(updates)
+          .eq("id", memberId);
+        if (updateError) {
+          console.error(`Failed to save ID photo path(s) for member ${memberId}:`, updateError);
+        }
+      }
+      return { memberId, code: data.code as string };
     }
     // unique_violation on (club_id, code) — another registration raced us
     // (or a deletion left a gap that made two computed sequences collide).

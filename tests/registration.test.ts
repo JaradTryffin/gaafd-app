@@ -9,11 +9,17 @@ import { signContract, getOrCreateContractTemplate } from "@/lib/contracts";
 const TINY_PNG_DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
+const TINY_PNG_BYTES = Buffer.from(
+  TINY_PNG_DATA_URL.replace(/^data:image\/png;base64,/, ""),
+  "base64",
+);
+
 let data: SeededData;
 let clubAClient: SupabaseClient;
 let clubBClient: SupabaseClient;
 const cleanupMemberIds: string[] = [];
 const cleanupSignaturePaths: string[] = [];
+const cleanupIdPhotoPaths: string[] = [];
 
 beforeAll(async () => {
   data = await seedTenants();
@@ -25,6 +31,9 @@ afterAll(async () => {
   const admin = createAdminClient();
   if (cleanupSignaturePaths.length > 0) {
     await admin.storage.from("signatures").remove(cleanupSignaturePaths);
+  }
+  if (cleanupIdPhotoPaths.length > 0) {
+    await admin.storage.from("member-ids").remove(cleanupIdPhotoPaths);
   }
   for (const memberId of cleanupMemberIds) {
     await admin.from("members").delete().eq("id", memberId);
@@ -171,5 +180,76 @@ describe("signContract", () => {
         },
       }),
     ).rejects.toThrow("Member not found in this club");
+  });
+});
+
+describe("registerMember with ID photos", () => {
+  it("uploads both ID photos and saves their paths when provided", async () => {
+    const idFront = new File([TINY_PNG_BYTES], "front.png", { type: "image/png" });
+    const idBack = new File([TINY_PNG_BYTES], "back.png", { type: "image/png" });
+
+    const { memberId } = await registerMember(clubAClient, {
+      clubId: data.clubA.clubId,
+      first: "Photo",
+      last: "Both",
+      type: "Full member",
+      idFront,
+      idBack,
+    });
+    cleanupMemberIds.push(memberId);
+    const frontPath = `${data.clubA.clubId}/${memberId}/front.png`;
+    const backPath = `${data.clubA.clubId}/${memberId}/back.png`;
+    cleanupIdPhotoPaths.push(frontPath, backPath);
+
+    const admin = createAdminClient();
+    const { data: row } = await admin
+      .from("members")
+      .select("id_front_url, id_back_url")
+      .eq("id", memberId)
+      .single();
+    expect(row?.id_front_url).toBe(frontPath);
+    expect(row?.id_back_url).toBe(backPath);
+
+    const { data: downloaded, error: downloadError } = await admin.storage
+      .from("member-ids")
+      .download(frontPath);
+    expect(downloadError).toBeNull();
+    expect(downloaded).not.toBeNull();
+  });
+
+  it("leaves both columns null and still succeeds when no photos are provided", async () => {
+    const { memberId } = await registerMember(clubAClient, {
+      clubId: data.clubA.clubId,
+      first: "Photo",
+      last: "None",
+      type: "Trial",
+    });
+    cleanupMemberIds.push(memberId);
+
+    const admin = createAdminClient();
+    const { data: row } = await admin
+      .from("members")
+      .select("id_front_url, id_back_url")
+      .eq("id", memberId)
+      .single();
+    expect(row?.id_front_url).toBeNull();
+    expect(row?.id_back_url).toBeNull();
+  });
+
+  it("does not let club B read a photo stored under club A's folder", async () => {
+    const idFront = new File([TINY_PNG_BYTES], "front.png", { type: "image/png" });
+    const { memberId } = await registerMember(clubAClient, {
+      clubId: data.clubA.clubId,
+      first: "Photo",
+      last: "Isolation",
+      type: "Trial",
+      idFront,
+    });
+    cleanupMemberIds.push(memberId);
+    const path = `${data.clubA.clubId}/${memberId}/front.png`;
+    cleanupIdPhotoPaths.push(path);
+
+    const { error } = await clubBClient.storage.from("member-ids").download(path);
+    expect(error).not.toBeNull();
   });
 });
