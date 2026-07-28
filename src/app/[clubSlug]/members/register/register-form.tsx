@@ -28,6 +28,8 @@ export function RegisterMemberForm({
   const [referrerId, setReferrerId] = useState("");
   const [appHandle, setAppHandle] = useState("");
   const [status, setStatus] = useState("active");
+  const [idFront, setIdFront] = useState<File | null>(null);
+  const [idBack, setIdBack] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -46,6 +48,8 @@ export function RegisterMemberForm({
         status: status as "active" | "inactive",
         referrerId: referrerId || undefined,
         appHandle: appHandle || undefined,
+        idFront,
+        idBack,
       });
       if (result?.error) {
         setError(result.error);
@@ -170,6 +174,30 @@ export function RegisterMemberForm({
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+          </div>
+          <div>
+            <label htmlFor="idFront" className="mb-1 block text-[11px] text-[#8a8e83]">
+              ID front (optional)
+            </label>
+            <input
+              id="idFront"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setIdFront(e.target.files?.[0] ?? null)}
+              className="w-full rounded-[9px] border border-input px-3 py-2.5 text-[13px]"
+            />
+          </div>
+          <div>
+            <label htmlFor="idBack" className="mb-1 block text-[11px] text-[#8a8e83]">
+              ID back (optional)
+            </label>
+            <input
+              id="idBack"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setIdBack(e.target.files?.[0] ?? null)}
+              className="w-full rounded-[9px] border border-input px-3 py-2.5 text-[13px]"
+            />
           </div>
 
           {error && <p className="col-span-2 text-[12.5px] text-destructive">{error}</p>}

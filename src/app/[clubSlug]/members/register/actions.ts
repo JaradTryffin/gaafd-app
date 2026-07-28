@@ -15,6 +15,8 @@ export async function registerMemberAction(input: {
   status: "active" | "inactive";
   referrerId?: string;
   appHandle?: string;
+  idFront?: File | null;
+  idBack?: File | null;
 }): Promise<{ error: string } | void> {
   const supabase = await createClient();
 
