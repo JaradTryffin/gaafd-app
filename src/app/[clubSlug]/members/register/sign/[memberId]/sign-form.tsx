@@ -18,7 +18,7 @@ export function SignAgreementForm({
   clubName: string;
   memberId: string;
   memberName: string;
-  template: { title: string; subtitle: string; consent: string; clauses: ContractClause[] };
+  template: { title: string; subtitle: string; consent: string; clauses: ContractClause[]; version: number };
 }) {
   const [consent, setConsent] = useState(false);
   const [hasInk, setHasInk] = useState(false);
@@ -41,11 +41,17 @@ export function SignAgreementForm({
       const result = await completeSignAction({
         clubSlug,
         clubId,
-        clubName,
         memberId,
         printedName,
         consent,
         signaturePngBase64: dataUrl,
+        template: {
+          title: template.title,
+          subtitle: template.subtitle,
+          consent: template.consent,
+          clauses: template.clauses,
+          version: template.version,
+        },
       });
       if (result?.error) {
         setError(result.error);
@@ -82,10 +88,7 @@ export function SignAgreementForm({
               onChange={(e) => setConsent(e.target.checked)}
               className="mt-0.5 h-4 w-4 accent-primary"
             />
-            <span>
-              I have read and agree to the {template.title}. I confirm I am 21 years or older and
-              that all information provided is accurate.
-            </span>
+            <span>{template.consent}</span>
           </label>
 
           <div className="mt-4 grid grid-cols-[1.4fr_1fr] gap-3.5">

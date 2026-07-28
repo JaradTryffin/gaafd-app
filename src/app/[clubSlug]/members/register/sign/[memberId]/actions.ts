@@ -2,16 +2,16 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { signContract } from "@/lib/contracts";
+import { signContract, type ContractTemplate } from "@/lib/contracts";
 
 export async function completeSignAction(input: {
   clubSlug: string;
   clubId: string;
-  clubName: string;
   memberId: string;
   printedName: string;
   consent: boolean;
   signaturePngBase64: string;
+  template: Pick<ContractTemplate, "title" | "subtitle" | "consent" | "clauses" | "version">;
 }): Promise<{ error: string } | void> {
   const supabase = await createClient();
 

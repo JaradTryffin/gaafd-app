@@ -89,11 +89,17 @@ describe("signContract", () => {
 
     const { signedContractId } = await signContract(clubAClient, {
       clubId: data.clubA.clubId,
-      clubName: "Test Club A",
       memberId,
       printedName: "Signer Test",
       consent: true,
       signaturePngBase64: TINY_PNG_DATA_URL,
+      template: {
+        title: template.title,
+        subtitle: template.subtitle,
+        consent: template.consent,
+        clauses: template.clauses,
+        version: template.version,
+      },
     });
     cleanupSignaturePaths.push(`${data.clubA.clubId}/${memberId}/${signedContractId}.png`);
 
@@ -118,14 +124,22 @@ describe("signContract", () => {
     });
     cleanupMemberIds.push(memberId);
 
+    const template = await getOrCreateContractTemplate(clubAClient, data.clubA.clubId, "Test Club A");
+
     await expect(
       signContract(clubAClient, {
         clubId: data.clubA.clubId,
-        clubName: "Test Club A",
         memberId,
         printedName: "",
         consent: false,
         signaturePngBase64: TINY_PNG_DATA_URL,
+        template: {
+          title: template.title,
+          subtitle: template.subtitle,
+          consent: template.consent,
+          clauses: template.clauses,
+          version: template.version,
+        },
       }),
     ).rejects.toThrow();
   });
@@ -139,14 +153,22 @@ describe("signContract", () => {
     });
     cleanupMemberIds.push(clubBMemberId);
 
+    const template = await getOrCreateContractTemplate(clubAClient, data.clubA.clubId, "Test Club A");
+
     await expect(
       signContract(clubAClient, {
         clubId: data.clubA.clubId,
-        clubName: "Test Club A",
         memberId: clubBMemberId,
         printedName: "",
         consent: true,
         signaturePngBase64: TINY_PNG_DATA_URL,
+        template: {
+          title: template.title,
+          subtitle: template.subtitle,
+          consent: template.consent,
+          clauses: template.clauses,
+          version: template.version,
+        },
       }),
     ).rejects.toThrow("Member not found in this club");
   });

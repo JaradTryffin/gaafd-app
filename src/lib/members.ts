@@ -20,37 +20,56 @@ async function nextMemberCode(supabase: SupabaseClient, clubId: string): Promise
     .single();
   if (clubError) throw clubError;
 
-  const { count, error: countError } = await supabase
+  const { data: existingCodes, error: codesError } = await supabase
     .from("members")
-    .select("id", { count: "exact", head: true })
-    .eq("club_id", clubId);
-  if (countError) throw countError;
+    .select("code")
+    .eq("club_id", clubId)
+    .like("code", `${club.initials}-%`);
+  if (codesError) throw codesError;
 
-  const sequence = (count ?? 0) + 1;
-  return `${club.initials}-${String(sequence).padStart(4, "0")}`;
+  const maxSequence = (existingCodes ?? []).reduce((max, row) => {
+    const match = /-(\d{4})$/.exec(row.code as string);
+    if (!match) return max;
+    return Math.max(max, Number(match[1]));
+  }, 0);
+
+  return `${club.initials}-${String(maxSequence + 1).padStart(4, "0")}`;
 }
 
 export async function registerMember(
   supabase: SupabaseClient,
   input: RegisterMemberInput,
 ): Promise<{ memberId: string; code: string }> {
-  const code = await nextMemberCode(supabase, input.clubId);
-  const { data, error } = await supabase
-    .from("members")
-    .insert({
-      club_id: input.clubId,
-      code,
-      first: input.first,
-      last: input.last,
-      type: input.type,
-      status: input.status ?? "active",
-      phone: input.phone || null,
-      email: input.email || null,
-      app_handle: input.appHandle || null,
-      referrer_id: input.referrerId || null,
-    })
-    .select("id, code")
-    .single();
-  if (error) throw error;
-  return { memberId: data.id, code: data.code };
+  const MAX_ATTEMPTS = 5;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const code = await nextMemberCode(supabase, input.clubId);
+    const { data, error } = await supabase
+      .from("members")
+      .insert({
+        club_id: input.clubId,
+        code,
+        first: input.first,
+        last: input.last,
+        type: input.type,
+        status: input.status ?? "active",
+        phone: input.phone || null,
+        email: input.email || null,
+        app_handle: input.appHandle || null,
+        referrer_id: input.referrerId || null,
+      })
+      .select("id, code")
+      .single();
+    if (!error) {
+      return { memberId: data.id, code: data.code };
+    }
+    // unique_violation on (club_id, code) — another registration raced us
+    // (or a deletion left a gap that made two computed sequences collide).
+    // Retry with a freshly recomputed code rather than surfacing a
+    // spurious error to the person registering a member.
+    if (error.code === "23505" && attempt < MAX_ATTEMPTS) {
+      continue;
+    }
+    throw error;
+  }
+  throw new Error("Failed to generate a unique member code after multiple attempts");
 }

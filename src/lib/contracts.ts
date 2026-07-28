@@ -185,11 +185,11 @@ export async function resetContractTemplate(
 
 export type SignContractInput = {
   clubId: string;
-  clubName: string;
   memberId: string;
   printedName: string;
   consent: boolean;
   signaturePngBase64: string;
+  template: Pick<ContractTemplate, "title" | "subtitle" | "consent" | "clauses" | "version">;
 };
 
 export async function signContract(
@@ -222,8 +222,6 @@ export async function signContract(
     throw new Error("Member not found in this club");
   }
 
-  const template = await getOrCreateContractTemplate(supabase, input.clubId, input.clubName);
-
   // Generated client-side, not the DB default, because the Storage path
   // needs this id BEFORE the row exists, and signed_contracts is
   // append-only (no UPDATE policy) — "insert then patch signature_url"
@@ -240,12 +238,15 @@ export async function signContract(
     id: signedContractId,
     club_id: input.clubId,
     member_id: input.memberId,
-    template_version: template.version,
+    template_version: input.template.version,
+    // Snapshot exactly what the member was shown and clicked "I agree" to
+    // on the Sign Agreement screen — not a re-fetch, which could reflect a
+    // template edit made after the member read it but before they signed.
     contract_snapshot: {
-      title: template.title,
-      subtitle: template.subtitle,
-      consent: template.consent,
-      clauses: template.clauses,
+      title: input.template.title,
+      subtitle: input.template.subtitle,
+      consent: input.template.consent,
+      clauses: input.template.clauses,
     },
     consent: input.consent,
     printed_name: input.printedName || null,
