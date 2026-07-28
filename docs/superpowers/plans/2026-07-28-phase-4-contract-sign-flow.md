@@ -244,6 +244,7 @@ Create `tests/contracts.test.ts`:
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { seedTenants, cleanupTenants, signInAs, type SeededData } from "./rls/fixtures";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getOrCreateContractTemplate,
   saveContractTemplate,
@@ -265,15 +266,38 @@ afterAll(async () => {
 }, 30000);
 
 describe("getOrCreateContractTemplate", () => {
-  it("seeds a real default template on first access", async () => {
-    const template = await getOrCreateContractTemplate(
-      clubAClient,
-      data.clubA.clubId,
-      "Test Club A",
-    );
-    expect(template.title).toContain("Test Club A");
-    expect(template.clauses).toHaveLength(9);
-    expect(template.version).toBe(1);
+  it("seeds a real default template for a club with no existing row", async () => {
+    // tests/rls/fixtures.ts's seedClub() already inserts a minimal test
+    // template for every club it creates (shared infrastructure other
+    // test files rely on) — so clubA/clubB from seedTenants() are NOT
+    // template-less. The only way to genuinely exercise the "no row yet"
+    // seeding path is a throwaway club created here, not reused from
+    // seedTenants.
+    const admin = createAdminClient();
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const { data: club, error } = await admin
+      .from("clubs")
+      .insert({
+        slug: `contracts-test-${suffix}`,
+        name: `Contracts Test Club ${suffix}`,
+        initials: "CT",
+        plan: "Trial",
+        region: "Test Region",
+        accent_color: "#3f7a4e",
+        status: "active",
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    try {
+      const template = await getOrCreateContractTemplate(admin, club.id, "Contracts Test Club");
+      expect(template.title).toContain("Contracts Test Club");
+      expect(template.clauses).toHaveLength(9);
+      expect(template.version).toBe(1);
+    } finally {
+      await admin.from("clubs").delete().eq("id", club.id);
+    }
   });
 
   it("returns the same template on a second call, not a duplicate", async () => {
@@ -325,7 +349,7 @@ cd /Users/user/Documents/projects/gaafd-app
 pnpm exec vitest run tests/contracts.test.ts
 ```
 
-Expected: `5 passed`. Hits the live Supabase project.
+Expected: `4 passed`. Hits the live Supabase project.
 
 - [ ] **Step 4: Commit**
 
