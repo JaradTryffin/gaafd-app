@@ -189,6 +189,7 @@ export async function getRecentActivity(
     const { data: donors, error: donorsError } = await supabase
       .from("members")
       .select("id, first, last")
+      .eq("club_id", clubId)
       .in("id", donorIds);
     if (donorsError) throw donorsError;
     donorNamesById = new Map((donors ?? []).map((m) => [m.id as string, `${m.first} ${m.last}`]));
