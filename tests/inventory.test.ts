@@ -109,4 +109,24 @@ describe("createMovement", () => {
       }),
     ).rejects.toThrow("Product not found in this club");
   });
+
+  it("rejects a non-integer quantity", async () => {
+    await expect(
+      createMovement(clubAClient, data.clubA.clubId, {
+        productId: data.clubA.productId,
+        type: "ADJUSTMENT",
+        qty: 1.5,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("rejects SALE at runtime even if the type check is bypassed", async () => {
+    await expect(
+      createMovement(clubAClient, data.clubA.clubId, {
+        productId: data.clubA.productId,
+        type: "SALE" as unknown as "ADJUSTMENT",
+        qty: 5,
+      }),
+    ).rejects.toThrow("Invalid movement type");
+  });
 });

@@ -89,13 +89,23 @@ function normalizeQty(type: LoggableMovementType, qty: number): number {
   return qty;
 }
 
+const LOGGABLE_TYPES: LoggableMovementType[] = ["PURCHASE", "ADJUSTMENT", "WASTE"];
+
 export async function createMovement(
   supabase: SupabaseClient,
   clubId: string,
   input: CreateMovementInput,
 ): Promise<{ movement: Movement; newStock: number }> {
-  if (!Number.isFinite(input.qty) || input.qty === 0) {
-    throw new Error("Enter a valid, non-zero quantity");
+  if (!Number.isFinite(input.qty) || input.qty === 0 || !Number.isInteger(input.qty)) {
+    throw new Error("Enter a valid, non-zero whole-number quantity");
+  }
+
+  // Runtime trust-boundary check: CreateMovementInput.type is typed as
+  // LoggableMovementType, but that's erased at the createMovementAction
+  // server-action boundary — a crafted call could still pass type: "SALE".
+  // SALE is exclusively written by the Dispensing/POS screen, never manually.
+  if (!LOGGABLE_TYPES.includes(input.type)) {
+    throw new Error("Invalid movement type");
   }
 
   // Defense-in-depth: RLS's inventory_moves INSERT policy only checks the
@@ -143,12 +153,15 @@ export async function createMovement(
     .single();
   if (error) throw error;
 
-  const { data: stockRow } = await supabase
+  const { data: stockRow, error: stockReadError } = await supabase
     .from("product_stock")
     .select("stock")
     .eq("product_id", input.productId)
     .eq("club_id", clubId)
     .maybeSingle();
+  if (stockReadError) {
+    console.error(`Failed to read updated stock for product ${input.productId}:`, stockReadError);
+  }
 
   const m = data as MovementRow;
   const movement: Movement = {

@@ -95,8 +95,8 @@ export function InventoryTable({
       setSaveError("Select a product");
       return;
     }
-    if (!Number.isFinite(qtyNum) || qtyNum === 0) {
-      setSaveError("Enter a valid, non-zero quantity");
+    if (!Number.isFinite(qtyNum) || qtyNum === 0 || !Number.isInteger(qtyNum)) {
+      setSaveError("Enter a valid, non-zero whole-number quantity");
       return;
     }
     startSaving(async () => {
@@ -307,7 +307,7 @@ export function InventoryTable({
                     inputMode="decimal"
                     value={draft.qty}
                     onChange={(e) =>
-                      setDraft((prev) => ({ ...prev, qty: e.target.value.replace(/[^0-9.-]/g, "") }))
+                      setDraft((prev) => ({ ...prev, qty: e.target.value.replace(/[^0-9-]/g, "") }))
                     }
                     placeholder="e.g. 100 or -4"
                     className="w-full rounded-[9px] border border-input px-3 py-2.5 font-mono text-[13px]"
