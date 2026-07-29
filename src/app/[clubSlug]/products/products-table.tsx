@@ -118,6 +118,10 @@ export function ProductsTable({ clubId, products: initialProducts }: { clubId: s
 
   function handleSave() {
     setSaveError(null);
+    if (!draft.name.trim()) {
+      setSaveError("Product name is required");
+      return;
+    }
     startSaving(async () => {
       const input = {
         name: draft.name,
