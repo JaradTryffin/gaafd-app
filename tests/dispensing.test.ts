@@ -151,6 +151,47 @@ describe("createDispenseOrder", () => {
     expect(await getBalance(member.id)).toBe(50);
   });
 
+  it("rejects when duplicate-product lines jointly exceed stock", async () => {
+    const product = await seedProduct(data.clubA.clubId, 40, 20);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 1000);
+
+    await expect(
+      createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+        { productId: product.id, qty: 15 },
+        { productId: product.id, qty: 15 },
+      ]),
+    ).rejects.toThrow();
+
+    expect(await getStock(product.id)).toBe(20);
+    expect(await getBalance(member.id)).toBe(1000);
+  });
+
+  it("merges duplicate-product lines into one snapshot line and one inventory_moves row on success", async () => {
+    const product = await seedProduct(data.clubA.clubId, 40, 20);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 1000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: product.id, qty: 8 },
+      { productId: product.id, qty: 7 },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0].qty).toBe(15);
+    expect(order.items[0].lineTotal).toBe(15 * 40);
+
+    expect(await getStock(product.id)).toBe(20 - 15);
+    expect(await getBalance(member.id)).toBe(1000 - 15 * 40);
+
+    const admin = createAdminClient();
+    const { data: moves, error } = await admin
+      .from("inventory_moves")
+      .select("id")
+      .eq("order_id", order.id);
+    if (error) throw error;
+    expect(moves).toHaveLength(1);
+  });
+
   it("rejects a product belonging to a different club", async () => {
     const member = await seedMemberWithBalance(data.clubA.clubId, 1000);
 
