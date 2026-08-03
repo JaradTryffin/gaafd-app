@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { assertClubAdmin } from "@/lib/auth/require-role";
 
 export type ContractClause = {
   heading: string;
@@ -148,6 +149,7 @@ export async function saveContractTemplate(
   clubId: string,
   input: { title: string; subtitle: string; consent: string; clauses: ContractClause[] },
 ): Promise<ContractTemplate> {
+  await assertClubAdmin(supabase, clubId);
   const { data: existing } = await supabase
     .from("contract_templates")
     .select("version")

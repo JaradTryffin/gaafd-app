@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sastDayRange } from "@/lib/format";
+import { assertClubAdmin } from "@/lib/auth/require-role";
 
 export type BusinessDay = {
   id: string;
@@ -159,6 +160,7 @@ export async function openBusinessDay(
   clubId: string,
   initialFloat: number,
 ): Promise<BusinessDay> {
+  await assertClubAdmin(supabase, clubId);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -192,6 +194,7 @@ export async function createWorkstation(
   clubId: string,
   name: string,
 ): Promise<Workstation> {
+  await assertClubAdmin(supabase, clubId);
   const { data, error } = await supabase
     .from("workstations")
     .insert({ club_id: clubId, name })
@@ -265,6 +268,7 @@ export async function closeBusinessDay(
   clubId: string,
   businessDayId: string,
 ): Promise<BusinessDay> {
+  await assertClubAdmin(supabase, clubId);
   const {
     data: { user },
   } = await supabase.auth.getUser();

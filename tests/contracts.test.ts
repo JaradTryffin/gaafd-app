@@ -10,13 +10,39 @@ import {
 
 let data: SeededData;
 let clubAClient: SupabaseClient;
+let staffClient: SupabaseClient;
+let staffUserId: string;
+const STAFF_PASSWORD = "Test-Password-123!";
 
 beforeAll(async () => {
   data = await seedTenants();
   clubAClient = await signInAs(data.clubA.adminEmail, data.clubA.adminPassword);
+
+  const admin = createAdminClient();
+  const staffEmail = `contracts-staff-${crypto.randomUUID().slice(0, 8)}@example.test`;
+  const { data: staffAuth, error: staffAuthError } = await admin.auth.admin.createUser({
+    email: staffEmail,
+    password: STAFF_PASSWORD,
+    email_confirm: true,
+  });
+  if (staffAuthError) throw staffAuthError;
+  staffUserId = staffAuth.user.id;
+
+  const { error: staffMembershipError } = await admin.from("club_users").insert({
+    club_id: data.clubA.clubId,
+    user_id: staffUserId,
+    role: "staff",
+  });
+  if (staffMembershipError) throw staffMembershipError;
+
+  staffClient = await signInAs(staffEmail, STAFF_PASSWORD);
 }, 30000);
 
 afterAll(async () => {
+  if (staffUserId) {
+    const admin = createAdminClient();
+    await admin.auth.admin.deleteUser(staffUserId);
+  }
   if (data) {
     await cleanupTenants(data);
   }
@@ -94,5 +120,26 @@ describe("resetContractTemplate", () => {
     expect(reset.title).toBe("Test Club A — Member Agreement");
     expect(reset.clauses).toHaveLength(9);
     expect(reset.version).toBe(before.version + 1);
+  });
+});
+
+describe("role-based access", () => {
+  it("rejects a staff-role user calling saveContractTemplate, but admin still succeeds", async () => {
+    await expect(
+      saveContractTemplate(staffClient, data.clubA.clubId, {
+        title: "Staff Attempt",
+        subtitle: "Should not save",
+        consent: "N/A",
+        clauses: [],
+      }),
+    ).rejects.toThrow("Admin access required");
+
+    const saved = await saveContractTemplate(clubAClient, data.clubA.clubId, {
+      title: "Admin Saved Title",
+      subtitle: "Admin subtitle",
+      consent: "Admin consent",
+      clauses: [{ heading: "Intro", body: "Admin clause body" }],
+    });
+    expect(saved.title).toBe("Admin Saved Title");
   });
 });

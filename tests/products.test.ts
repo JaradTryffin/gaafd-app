@@ -13,18 +13,43 @@ import {
 let data: SeededData;
 let clubAClient: SupabaseClient;
 let clubBClient: SupabaseClient;
+let staffClient: SupabaseClient;
+let staffUserId: string;
+const STAFF_PASSWORD = "Test-Password-123!";
 const cleanupProductIds: string[] = [];
 
 beforeAll(async () => {
   data = await seedTenants();
   clubAClient = await signInAs(data.clubA.adminEmail, data.clubA.adminPassword);
   clubBClient = await signInAs(data.clubB.adminEmail, data.clubB.adminPassword);
+
+  const admin = createAdminClient();
+  const staffEmail = `products-staff-${crypto.randomUUID().slice(0, 8)}@example.test`;
+  const { data: staffAuth, error: staffAuthError } = await admin.auth.admin.createUser({
+    email: staffEmail,
+    password: STAFF_PASSWORD,
+    email_confirm: true,
+  });
+  if (staffAuthError) throw staffAuthError;
+  staffUserId = staffAuth.user.id;
+
+  const { error: staffMembershipError } = await admin.from("club_users").insert({
+    club_id: data.clubA.clubId,
+    user_id: staffUserId,
+    role: "staff",
+  });
+  if (staffMembershipError) throw staffMembershipError;
+
+  staffClient = await signInAs(staffEmail, STAFF_PASSWORD);
 }, 30000);
 
 afterAll(async () => {
   const admin = createAdminClient();
   if (cleanupProductIds.length > 0) {
     await admin.from("products").delete().in("id", cleanupProductIds);
+  }
+  if (staffUserId) {
+    await admin.auth.admin.deleteUser(staffUserId);
   }
   if (data) {
     await cleanupTenants(data);
@@ -168,5 +193,58 @@ describe("hasProductHistory / deleteOrDeactivateProduct", () => {
       data.clubA.productId,
     );
     expect(reactivateResult).toEqual({ action: "reactivated" });
+  });
+});
+
+describe("role-based access", () => {
+  it("rejects a staff-role user calling createProduct/updateProduct/deleteOrDeactivateProduct, but admin still succeeds", async () => {
+    await expect(
+      createProduct(staffClient, data.clubA.clubId, {
+        name: "Staff Attempt",
+        category: "Flower",
+        unit: "per 1g",
+        tokenPrice: 10,
+        sellPrice: 15,
+        flags: [],
+      }),
+    ).rejects.toThrow("Admin access required");
+
+    const product = await createProduct(clubAClient, data.clubA.clubId, {
+      name: "Admin Created Product",
+      category: "Flower",
+      unit: "per 1g",
+      tokenPrice: 10,
+      sellPrice: 15,
+      flags: [],
+    });
+    cleanupProductIds.push(product.id);
+
+    await expect(
+      updateProduct(staffClient, data.clubA.clubId, product.id, {
+        name: "Staff Edited",
+        category: "Flower",
+        unit: "per 1g",
+        tokenPrice: 20,
+        sellPrice: 30,
+        flags: [],
+      }),
+    ).rejects.toThrow("Admin access required");
+
+    const updated = await updateProduct(clubAClient, data.clubA.clubId, product.id, {
+      name: "Admin Edited",
+      category: "Flower",
+      unit: "per 1g",
+      tokenPrice: 20,
+      sellPrice: 30,
+      flags: [],
+    });
+    expect(updated.name).toBe("Admin Edited");
+
+    await expect(deleteOrDeactivateProduct(staffClient, data.clubA.clubId, product.id)).rejects.toThrow(
+      "Admin access required",
+    );
+
+    const result = await deleteOrDeactivateProduct(clubAClient, data.clubA.clubId, product.id);
+    expect(result.action).toBe("deleted");
   });
 });

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { assertClubAdmin } from "@/lib/auth/require-role";
 
 export type ProductCategory = "Flower" | "Pre-rolls" | "Edibles" | "Concentrate" | "Accessory";
 
@@ -91,6 +92,7 @@ export async function createProduct(
   clubId: string,
   input: ProductInput,
 ): Promise<Product> {
+  await assertClubAdmin(supabase, clubId);
   const { data, error } = await supabase
     .from("products")
     .insert({
@@ -116,6 +118,7 @@ export async function updateProduct(
   productId: string,
   input: ProductInput,
 ): Promise<Product> {
+  await assertClubAdmin(supabase, clubId);
   const { data, error } = await supabase
     .from("products")
     .update({
@@ -167,6 +170,7 @@ export async function deleteOrDeactivateProduct(
   clubId: string,
   productId: string,
 ): Promise<DeleteOrDeactivateResult> {
+  await assertClubAdmin(supabase, clubId);
   const hasHistory = await hasProductHistory(supabase, clubId, productId);
 
   if (!hasHistory) {

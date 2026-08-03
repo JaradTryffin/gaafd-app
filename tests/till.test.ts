@@ -136,3 +136,27 @@ describe("cross-club isolation", () => {
     // status, so no explicit close/cleanup is needed in this test.
   });
 });
+
+describe("role-based access", () => {
+  it("rejects a staff-role user calling openBusinessDay/createWorkstation/closeBusinessDay, but admin still succeeds", async () => {
+    await expect(openBusinessDay(staffClient, data.clubA.clubId, 500)).rejects.toThrow(
+      "Admin access required",
+    );
+
+    const day = await openBusinessDay(clubAClient, data.clubA.clubId, 500);
+
+    await expect(
+      createWorkstation(staffClient, data.clubA.clubId, "Staff Attempt Workstation"),
+    ).rejects.toThrow("Admin access required");
+
+    const workstation = await createWorkstation(clubAClient, data.clubA.clubId, "Admin Workstation");
+    expect(workstation.name).toBe("Admin Workstation");
+
+    await expect(closeBusinessDay(staffClient, data.clubA.clubId, day.id)).rejects.toThrow(
+      "Admin access required",
+    );
+
+    const closedDay = await closeBusinessDay(clubAClient, data.clubA.clubId, day.id);
+    expect(closedDay.status).toBe("closed");
+  });
+});
