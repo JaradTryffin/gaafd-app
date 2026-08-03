@@ -247,4 +247,54 @@ describe("role-based access", () => {
     const result = await deleteOrDeactivateProduct(clubAClient, data.clubA.clubId, product.id);
     expect(result.action).toBe("deleted");
   });
+
+  it("RLS itself rejects a direct staff INSERT/UPDATE/DELETE on products, bypassing assertClubAdmin entirely", async () => {
+    const { error: insertError } = await staffClient.from("products").insert({
+      club_id: data.clubA.clubId,
+      name: "Direct REST Bypass Attempt",
+      category: "Flower",
+      unit: "per 1g",
+      token_price: 10,
+      sell_price: 15,
+    });
+    expect(insertError).not.toBeNull();
+
+    const { data: adminProduct, error: adminInsertError } = await clubAClient
+      .from("products")
+      .insert({
+        club_id: data.clubA.clubId,
+        name: "Direct Admin Insert",
+        category: "Flower",
+        unit: "per 1g",
+        token_price: 10,
+        sell_price: 15,
+      })
+      .select()
+      .single();
+    expect(adminInsertError).toBeNull();
+    cleanupProductIds.push(adminProduct!.id);
+
+    const { error: staffUpdateError } = await staffClient
+      .from("products")
+      .update({ name: "Staff Direct Update Attempt" })
+      .eq("id", adminProduct!.id);
+    // RLS silently matches zero rows rather than throwing — assert the
+    // name was NOT changed, not just that no error was thrown.
+    const { data: afterStaffUpdate } = await clubAClient
+      .from("products")
+      .select("name")
+      .eq("id", adminProduct!.id)
+      .single();
+    expect(afterStaffUpdate!.name).toBe("Direct Admin Insert");
+    void staffUpdateError;
+
+    const { error: staffDeleteError } = await staffClient.from("products").delete().eq("id", adminProduct!.id);
+    void staffDeleteError;
+    const { data: stillExists } = await clubAClient
+      .from("products")
+      .select("id")
+      .eq("id", adminProduct!.id)
+      .maybeSingle();
+    expect(stillExists).not.toBeNull();
+  });
 });

@@ -159,4 +159,19 @@ describe("role-based access", () => {
     const closedDay = await closeBusinessDay(clubAClient, data.clubA.clubId, day.id);
     expect(closedDay.status).toBe("closed");
   });
+
+  it("RLS itself rejects a direct staff INSERT on business_days and workstations, bypassing assertClubAdmin entirely", async () => {
+    const { error: dayInsertError } = await staffClient.from("business_days").insert({
+      club_id: data.clubA.clubId,
+      initial_float: 999,
+      opened_by_email: "staff-bypass-attempt@example.test",
+    });
+    expect(dayInsertError).not.toBeNull();
+
+    const { error: workstationInsertError } = await staffClient.from("workstations").insert({
+      club_id: data.clubA.clubId,
+      name: "Staff Direct Insert Attempt",
+    });
+    expect(workstationInsertError).not.toBeNull();
+  });
 });

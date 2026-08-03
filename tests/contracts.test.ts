@@ -142,4 +142,21 @@ describe("role-based access", () => {
     });
     expect(saved.title).toBe("Admin Saved Title");
   });
+
+  it("RLS itself rejects a direct staff UPDATE on contract_templates, bypassing assertClubAdmin entirely", async () => {
+    await getOrCreateContractTemplate(clubAClient, data.clubA.clubId, "RLS Test Club A");
+
+    const { error: staffUpdateError } = await staffClient
+      .from("contract_templates")
+      .update({ title: "Staff Direct Update Attempt" })
+      .eq("club_id", data.clubA.clubId);
+    void staffUpdateError;
+
+    const { data: afterStaffUpdate } = await clubAClient
+      .from("contract_templates")
+      .select("title")
+      .eq("club_id", data.clubA.clubId)
+      .single();
+    expect(afterStaffUpdate!.title).not.toBe("Staff Direct Update Attempt");
+  });
 });

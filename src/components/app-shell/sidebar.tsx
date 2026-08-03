@@ -113,14 +113,17 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-1.5">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label}>
-            <div className="px-2.5 pb-1.5 pt-2.5 text-[10px] uppercase tracking-[.09em] text-sidebar-text-muted">
-              {group.label}
-            </div>
-            {group.items
-              .filter((item) => !("adminOnly" in item && item.adminOnly) || club.role === "admin")
-              .map((item) => {
+        {NAV_GROUPS.map((group) => {
+          const visibleItems = group.items.filter(
+            (item) => !("adminOnly" in item && item.adminOnly) || club.role === "admin",
+          );
+          if (visibleItems.length === 0) return null;
+          return (
+            <div key={group.label}>
+              <div className="px-2.5 pb-1.5 pt-2.5 text-[10px] uppercase tracking-[.09em] text-sidebar-text-muted">
+                {group.label}
+              </div>
+              {visibleItems.map((item) => {
                 const href = `/${club.slug}${item.path}`;
                 const active = item.path === "" ? pathname === href : pathname.startsWith(href);
                 return (
@@ -139,8 +142,9 @@ export function Sidebar({
                   </Link>
                 );
               })}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="flex items-center gap-2.5 border-t border-sidebar-border-dark p-3">
