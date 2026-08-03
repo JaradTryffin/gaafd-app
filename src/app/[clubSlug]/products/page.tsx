@@ -14,6 +14,7 @@ export default async function ProductsPage({
   const supabase = await createClient();
   const access = await resolveClubAccess(supabase, clubSlug);
   if (!access) notFound();
+  if (access.role !== "admin") notFound();
 
   const products = await getProducts(supabase, access.clubId);
 

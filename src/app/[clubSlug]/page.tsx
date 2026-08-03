@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveClubAccess } from "@/lib/auth/club-access";
 import {
@@ -20,6 +20,7 @@ export default async function DashboardPage({
   const supabase = await createClient();
   const access = await resolveClubAccess(supabase, clubSlug);
   if (!access) notFound();
+  if (access.role !== "admin") redirect(`/${clubSlug}/dispense`);
 
   const [kpis, lowStockAlerts, activity] = await Promise.all([
     getDashboardKpis(supabase, access.clubId),

@@ -11,10 +11,10 @@ const NAV_GROUPS = [
   {
     label: "Operations",
     items: [
-      { key: "dashboard", label: "Dashboard", path: "", dot: "var(--sidebar-accent-dot)" },
+      { key: "dashboard", label: "Dashboard", path: "", dot: "var(--sidebar-accent-dot)", adminOnly: true },
       { key: "dispense", label: "Dispensing", path: "/dispense", dot: "var(--badge-warn-fg)" },
       { key: "members", label: "Members", path: "/members", dot: "var(--primary)" },
-      { key: "products", label: "Products", path: "/products", dot: "var(--tenant-accent-2)" },
+      { key: "products", label: "Products", path: "/products", dot: "var(--tenant-accent-2)", adminOnly: true },
       { key: "inventory", label: "Inventory", path: "/inventory", dot: "var(--tenant-accent-3)" },
     ],
   },
@@ -33,6 +33,7 @@ const NAV_GROUPS = [
         label: "Contract template",
         path: "/settings/contract",
         dot: "var(--text-muted-2)",
+        adminOnly: true,
       },
     ],
   },
@@ -117,25 +118,27 @@ export function Sidebar({
             <div className="px-2.5 pb-1.5 pt-2.5 text-[10px] uppercase tracking-[.09em] text-sidebar-text-muted">
               {group.label}
             </div>
-            {group.items.map((item) => {
-              const href = `/${club.slug}${item.path}`;
-              const active = item.path === "" ? pathname === href : pathname.startsWith(href);
-              return (
-                <Link
-                  key={item.key}
-                  href={href}
-                  className="my-px flex items-center gap-2.5 rounded-r-lg border-l-2 px-[11px] py-[9px] text-[13px]"
-                  style={{
-                    background: active ? "var(--sidebar-surface)" : "transparent",
-                    borderLeftColor: active ? "var(--sidebar-accent-dot)" : "transparent",
-                    color: active ? "#eef1ea" : "#a8afa1",
-                  }}
-                >
-                  <span className="h-1.5 w-1.5 flex-none rounded-sm" style={{ background: item.dot }} />
-                  <span className="flex-1">{item.label}</span>
-                </Link>
-              );
-            })}
+            {group.items
+              .filter((item) => !("adminOnly" in item && item.adminOnly) || club.role === "admin")
+              .map((item) => {
+                const href = `/${club.slug}${item.path}`;
+                const active = item.path === "" ? pathname === href : pathname.startsWith(href);
+                return (
+                  <Link
+                    key={item.key}
+                    href={href}
+                    className="my-px flex items-center gap-2.5 rounded-r-lg border-l-2 px-[11px] py-[9px] text-[13px]"
+                    style={{
+                      background: active ? "var(--sidebar-surface)" : "transparent",
+                      borderLeftColor: active ? "var(--sidebar-accent-dot)" : "transparent",
+                      color: active ? "#eef1ea" : "#a8afa1",
+                    }}
+                  >
+                    <span className="h-1.5 w-1.5 flex-none rounded-sm" style={{ background: item.dot }} />
+                    <span className="flex-1">{item.label}</span>
+                  </Link>
+                );
+              })}
           </div>
         ))}
       </nav>

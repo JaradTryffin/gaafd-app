@@ -13,6 +13,7 @@ export default async function ContractTemplatePage({
   const supabase = await createClient();
   const access = await resolveClubAccess(supabase, clubSlug);
   if (!access) notFound();
+  if (access.role !== "admin") notFound();
 
   const template = await getOrCreateContractTemplate(supabase, access.clubId, access.name);
 
