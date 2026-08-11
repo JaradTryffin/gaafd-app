@@ -3,6 +3,8 @@ import { assertClubAdmin } from "@/lib/auth/require-role";
 
 export type ProductCategory = "Flower" | "Pre-rolls" | "Edibles" | "Concentrate" | "Accessory";
 
+export type PriceTier = { minQty: number; unitPrice: number };
+
 export type Product = {
   id: string;
   name: string;
@@ -15,6 +17,7 @@ export type Product = {
   flags: string[];
   active: boolean;
   stock: number;
+  priceTiers: PriceTier[];
 };
 
 type ProductRow = {
@@ -27,6 +30,7 @@ type ProductRow = {
   cost: number | null;
   description: string | null;
   flags: string[];
+  price_tiers: PriceTier[];
   active: boolean;
 };
 
@@ -41,12 +45,13 @@ function mapProduct(row: ProductRow, stock: number): Product {
     cost: row.cost === null ? null : Number(row.cost),
     description: row.description,
     flags: row.flags ?? [],
+    priceTiers: row.price_tiers ?? [],
     active: row.active,
     stock,
   };
 }
 
-const PRODUCT_COLUMNS = "id, name, category, unit, token_price, sell_price, cost, description, flags, active";
+const PRODUCT_COLUMNS = "id, name, category, unit, token_price, sell_price, cost, description, flags, price_tiers, active";
 
 export async function getProducts(supabase: SupabaseClient, clubId: string): Promise<Product[]> {
   const { data: products, error: productsError } = await supabase
@@ -85,6 +90,7 @@ export type ProductInput = {
   cost?: number | null;
   description?: string | null;
   flags: string[];
+  priceTiers: PriceTier[];
 };
 
 export async function createProduct(
@@ -105,6 +111,7 @@ export async function createProduct(
       cost: input.cost ?? null,
       description: input.description || null,
       flags: input.flags,
+      price_tiers: input.priceTiers,
     })
     .select(PRODUCT_COLUMNS)
     .single();
@@ -130,6 +137,7 @@ export async function updateProduct(
       cost: input.cost ?? null,
       description: input.description || null,
       flags: input.flags,
+      price_tiers: input.priceTiers,
     })
     .eq("id", productId)
     .eq("club_id", clubId)
@@ -196,4 +204,9 @@ export async function deleteOrDeactivateProduct(
   if (updateError) throw updateError;
 
   return { action: nextActive ? "reactivated" : "deactivated" };
+}
+
+export function effectiveUnitPrice(basePrice: number, tiers: PriceTier[], qty: number): number {
+  const applicable = tiers.filter((t) => t.minQty <= qty).sort((a, b) => b.minQty - a.minQty);
+  return applicable.length > 0 ? applicable[0].unitPrice : basePrice;
 }

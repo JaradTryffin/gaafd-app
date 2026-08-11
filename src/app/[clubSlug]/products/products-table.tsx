@@ -8,7 +8,7 @@ import {
   checkProductHistoryAction,
   deleteOrDeactivateProductAction,
 } from "./actions";
-import type { Product, ProductCategory } from "@/lib/products";
+import type { PriceTier, Product, ProductCategory } from "@/lib/products";
 
 const CATEGORIES: ProductCategory[] = ["Flower", "Pre-rolls", "Edibles", "Concentrate", "Accessory"];
 const LOW_STOCK_THRESHOLD = 8;
@@ -34,6 +34,9 @@ type ProductDraft = {
   cost: string;
   description: string;
   flags: string[];
+  // No form control edits this yet (that's a later UI task) — carried
+  // through so saving an existing product doesn't silently clear its tiers.
+  priceTiers: PriceTier[];
 };
 
 const EMPTY_DRAFT: ProductDraft = {
@@ -45,6 +48,7 @@ const EMPTY_DRAFT: ProductDraft = {
   cost: "",
   description: "",
   flags: [],
+  priceTiers: [],
 };
 
 function draftFromProduct(product: Product): ProductDraft {
@@ -57,6 +61,7 @@ function draftFromProduct(product: Product): ProductDraft {
     cost: product.cost === null ? "" : String(product.cost),
     description: product.description ?? "",
     flags: product.flags,
+    priceTiers: product.priceTiers,
   };
 }
 
@@ -132,6 +137,7 @@ export function ProductsTable({ clubId, products: initialProducts }: { clubId: s
         cost: draft.cost === "" ? null : Number(draft.cost),
         description: draft.description || null,
         flags: draft.flags,
+        priceTiers: draft.priceTiers,
       };
       const result =
         modalMode === "create"

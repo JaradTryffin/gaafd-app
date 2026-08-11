@@ -79,6 +79,7 @@ describe("getProducts", () => {
       tokenPrice: 40,
       sellPrice: 50,
       flags: [],
+      priceTiers: [],
     });
     cleanupProductIds.push(created.id);
 
@@ -100,6 +101,7 @@ describe("createProduct", () => {
       cost: 40.5,
       description: "Test description",
       flags: ["app", "gift"],
+      priceTiers: [],
     });
     cleanupProductIds.push(created.id);
 
@@ -120,6 +122,7 @@ describe("updateProduct", () => {
       tokenPrice: 20,
       sellPrice: 30,
       flags: [],
+      priceTiers: [],
     });
     cleanupProductIds.push(created.id);
 
@@ -130,6 +133,7 @@ describe("updateProduct", () => {
       tokenPrice: 25,
       sellPrice: 35,
       flags: ["nodisc"],
+      priceTiers: [],
     });
 
     expect(updated.name).toBe("After Update");
@@ -147,6 +151,7 @@ describe("updateProduct", () => {
         tokenPrice: 1,
         sellPrice: 1,
         flags: [],
+        priceTiers: [],
       }),
     ).rejects.toThrow();
   });
@@ -161,6 +166,7 @@ describe("hasProductHistory / deleteOrDeactivateProduct", () => {
       tokenPrice: 5,
       sellPrice: 10,
       flags: [],
+      priceTiers: [],
     });
 
     const hasHistory = await hasProductHistory(clubAClient, data.clubA.clubId, created.id);
@@ -206,6 +212,7 @@ describe("role-based access", () => {
         tokenPrice: 10,
         sellPrice: 15,
         flags: [],
+        priceTiers: [],
       }),
     ).rejects.toThrow("Admin access required");
 
@@ -216,6 +223,7 @@ describe("role-based access", () => {
       tokenPrice: 10,
       sellPrice: 15,
       flags: [],
+      priceTiers: [],
     });
     cleanupProductIds.push(product.id);
 
@@ -227,6 +235,7 @@ describe("role-based access", () => {
         tokenPrice: 20,
         sellPrice: 30,
         flags: [],
+        priceTiers: [],
       }),
     ).rejects.toThrow("Admin access required");
 
@@ -237,6 +246,7 @@ describe("role-based access", () => {
       tokenPrice: 20,
       sellPrice: 30,
       flags: [],
+      priceTiers: [],
     });
     expect(updated.name).toBe("Admin Edited");
 
@@ -296,5 +306,50 @@ describe("role-based access", () => {
       .eq("id", adminProduct!.id)
       .maybeSingle();
     expect(stillExists).not.toBeNull();
+  });
+});
+
+describe("price tiers", () => {
+  it("round-trips priceTiers through createProduct and updateProduct", async () => {
+    const created = await createProduct(clubAClient, data.clubA.clubId, {
+      name: "Tiered Product",
+      category: "Flower",
+      unit: "per 1g",
+      tokenPrice: 150,
+      sellPrice: 225,
+      flags: [],
+      priceTiers: [{ minQty: 10, unitPrice: 100 }],
+    });
+    cleanupProductIds.push(created.id);
+    expect(created.priceTiers).toEqual([{ minQty: 10, unitPrice: 100 }]);
+
+    const withoutTiers = await createProduct(clubAClient, data.clubA.clubId, {
+      name: "Untiered Product",
+      category: "Flower",
+      unit: "per 1g",
+      tokenPrice: 40,
+      sellPrice: 60,
+      flags: [],
+      priceTiers: [],
+    });
+    cleanupProductIds.push(withoutTiers.id);
+    expect(withoutTiers.priceTiers).toEqual([]);
+
+    const updated = await updateProduct(clubAClient, data.clubA.clubId, created.id, {
+      name: "Tiered Product",
+      category: "Flower",
+      unit: "per 1g",
+      tokenPrice: 150,
+      sellPrice: 225,
+      flags: [],
+      priceTiers: [
+        { minQty: 10, unitPrice: 100 },
+        { minQty: 20, unitPrice: 90 },
+      ],
+    });
+    expect(updated.priceTiers).toEqual([
+      { minQty: 10, unitPrice: 100 },
+      { minQty: 20, unitPrice: 90 },
+    ]);
   });
 });

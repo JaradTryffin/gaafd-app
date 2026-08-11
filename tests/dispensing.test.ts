@@ -229,3 +229,67 @@ describe("createDispenseOrder", () => {
     expect(await getBalance(member.id)).toBe(1000);
   });
 });
+
+describe("bulk pricing", () => {
+  it("checks out at the flat price when no tiers are configured (regression)", async () => {
+    const product = await seedProduct(data.clubA.clubId, 150, 50);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 5000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: product.id, qty: 3 },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.tokenTotal).toBe(450);
+    expect(order.items[0].tokenPrice).toBe(150);
+  });
+
+  it("applies the base price below a tier threshold and the tier price at/above it", async () => {
+    const product = await seedProduct(data.clubA.clubId, 150, 50);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 5000);
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("products")
+      .update({ price_tiers: [{ minQty: 10, unitPrice: 100 }] })
+      .eq("id", product.id);
+    if (error) throw error;
+
+    const belowThreshold = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: product.id, qty: 5 },
+    ]);
+    cleanupOrderIds.push(belowThreshold.id);
+    expect(belowThreshold.tokenTotal).toBe(750);
+    expect(belowThreshold.items[0].tokenPrice).toBe(150);
+
+    const atThreshold = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: product.id, qty: 10 },
+    ]);
+    cleanupOrderIds.push(atThreshold.id);
+    expect(atThreshold.tokenTotal).toBe(1000);
+    expect(atThreshold.items[0].tokenPrice).toBe(100);
+  });
+
+  it("prices a two-line order of the same product at the tier rate when the combined quantity crosses the threshold", async () => {
+    const product = await seedProduct(data.clubA.clubId, 150, 50);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 5000);
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("products")
+      .update({ price_tiers: [{ minQty: 10, unitPrice: 100 }] })
+      .eq("id", product.id);
+    if (error) throw error;
+
+    // Neither line alone reaches qty 10, but combined (4+6=10) they do —
+    // proves the tier lookup happens after aggregation, not per raw line.
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: product.id, qty: 4 },
+      { productId: product.id, qty: 6 },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.tokenTotal).toBe(1000);
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0].qty).toBe(10);
+    expect(order.items[0].tokenPrice).toBe(100);
+  });
+});
