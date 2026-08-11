@@ -8,7 +8,7 @@ import {
   checkProductHistoryAction,
   deleteOrDeactivateProductAction,
 } from "./actions";
-import type { PriceTier, Product, ProductCategory } from "@/lib/products";
+import type { Product, ProductCategory } from "@/lib/products";
 
 const CATEGORIES: ProductCategory[] = ["Flower", "Pre-rolls", "Edibles", "Concentrate", "Accessory"];
 const LOW_STOCK_THRESHOLD = 8;
@@ -25,6 +25,8 @@ const FLAG_CHIP_LABELS: Record<string, string> = {
   nodisc: "No disc",
 };
 
+type PriceTierDraft = { minQty: string; unitPrice: string };
+
 type ProductDraft = {
   name: string;
   category: ProductCategory;
@@ -34,9 +36,7 @@ type ProductDraft = {
   cost: string;
   description: string;
   flags: string[];
-  // No form control edits this yet (that's a later UI task) — carried
-  // through so saving an existing product doesn't silently clear its tiers.
-  priceTiers: PriceTier[];
+  priceTiers: PriceTierDraft[];
 };
 
 const EMPTY_DRAFT: ProductDraft = {
@@ -61,7 +61,10 @@ function draftFromProduct(product: Product): ProductDraft {
     cost: product.cost === null ? "" : String(product.cost),
     description: product.description ?? "",
     flags: product.flags,
-    priceTiers: product.priceTiers,
+    priceTiers: product.priceTiers.map((t) => ({
+      minQty: String(t.minQty),
+      unitPrice: String(t.unitPrice),
+    })),
   };
 }
 
@@ -121,6 +124,23 @@ export function ProductsTable({ clubId, products: initialProducts }: { clubId: s
     }));
   }
 
+  function addTierRow() {
+    setDraft((prev) => ({ ...prev, priceTiers: [...prev.priceTiers, { minQty: "", unitPrice: "" }] }));
+  }
+
+  function removeTierRow(index: number) {
+    setDraft((prev) => ({ ...prev, priceTiers: prev.priceTiers.filter((_, i) => i !== index) }));
+  }
+
+  function updateTierRow(index: number, field: "minQty" | "unitPrice", value: string) {
+    setDraft((prev) => ({
+      ...prev,
+      priceTiers: prev.priceTiers.map((t, i) =>
+        i === index ? { ...t, [field]: value.replace(/[^0-9]/g, "") } : t,
+      ),
+    }));
+  }
+
   function handleSave() {
     setSaveError(null);
     if (!draft.name.trim()) {
@@ -137,7 +157,9 @@ export function ProductsTable({ clubId, products: initialProducts }: { clubId: s
         cost: draft.cost === "" ? null : Number(draft.cost),
         description: draft.description || null,
         flags: draft.flags,
-        priceTiers: draft.priceTiers,
+        priceTiers: draft.priceTiers
+          .map((t) => ({ minQty: Number(t.minQty) || 0, unitPrice: Number(t.unitPrice) || 0 }))
+          .filter((t) => t.minQty > 0 && t.unitPrice > 0),
       };
       const result =
         modalMode === "create"
@@ -463,6 +485,65 @@ export function ProductsTable({ clubId, products: initialProducts }: { clubId: s
                     </button>
                   ))}
                 </div>
+              </div>
+              <div className="mb-4">
+                <div className="mb-[7px] flex items-center justify-between">
+                  <div className="text-[11px] text-[#8a8e83]">Bulk pricing</div>
+                  <button
+                    type="button"
+                    onClick={addTierRow}
+                    className="rounded-[6px] border border-input bg-muted px-2 py-1 text-[11px] font-medium text-[#6b6f66]"
+                  >
+                    + Add price break
+                  </button>
+                </div>
+                {draft.priceTiers.length === 0 ? (
+                  <p className="text-[11.5px] text-[#9a9e93]">
+                    No bulk pricing configured — every quantity charges the token price above.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {draft.priceTiers.map((tier, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <label htmlFor={`tierMinQty-${index}`} className="sr-only">
+                            Minimum quantity
+                          </label>
+                          <input
+                            id={`tierMinQty-${index}`}
+                            inputMode="numeric"
+                            value={tier.minQty}
+                            onChange={(e) => updateTierRow(index, "minQty", e.target.value)}
+                            placeholder="Qty (e.g. 10)"
+                            className="w-full rounded-[8px] border border-input px-2.5 py-2 font-mono text-[12.5px]"
+                          />
+                        </div>
+                        <span className="text-[11px] text-[#9a9e93]">at</span>
+                        <div className="flex-1">
+                          <label htmlFor={`tierUnitPrice-${index}`} className="sr-only">
+                            Price per unit at this quantity
+                          </label>
+                          <input
+                            id={`tierUnitPrice-${index}`}
+                            inputMode="numeric"
+                            value={tier.unitPrice}
+                            onChange={(e) => updateTierRow(index, "unitPrice", e.target.value)}
+                            placeholder="Tok/unit (e.g. 100)"
+                            className="w-full rounded-[8px] border border-input px-2.5 py-2 font-mono text-[12.5px]"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeTierRow(index)}
+                          title="Remove price break"
+                          className="h-[30px] w-[30px] flex-none rounded-[7px] border border-input text-[13px] text-destructive"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               {modalMode === "edit" && (
                 <div className="mb-4 flex items-start gap-2 rounded-[9px] border border-dashed border-[#d6d2c5] bg-muted px-[13px] py-[11px] text-[12px] text-[#7c7f74]">

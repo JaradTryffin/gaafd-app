@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useToast } from "@/lib/toast-context";
 import { createDispenseOrderAction } from "./actions";
-import type { Product, ProductCategory } from "@/lib/products";
+import { effectiveUnitPrice, type Product, type ProductCategory } from "@/lib/products";
 import type { MemberListRow } from "@/lib/members";
 
 const CATEGORIES: (ProductCategory | "All")[] = [
@@ -49,12 +49,13 @@ export function DispensingPanel({
 
   const cartLines = Object.entries(cart).map(([productId, qty]) => {
     const product = productById.get(productId);
+    const tokenPrice = product ? effectiveUnitPrice(product.tokenPrice, product.priceTiers, qty) : 0;
     return {
       productId,
       qty,
       name: product?.name ?? "—",
-      tokenPrice: product?.tokenPrice ?? 0,
-      lineTotal: (product?.tokenPrice ?? 0) * qty,
+      tokenPrice,
+      lineTotal: tokenPrice * qty,
     };
   });
   const cartCount = cartLines.reduce((sum, l) => sum + l.qty, 0);
@@ -230,6 +231,14 @@ export function DispensingPanel({
                     +
                   </div>
                 </div>
+                {p.priceTiers.length > 0 && (
+                  <div className="mt-1 truncate text-[10px] text-[#8a8e83]">
+                    {[...p.priceTiers]
+                      .sort((a, b) => a.minQty - b.minQty)
+                      .map((t) => `${t.minQty}+: ${t.unitPrice} tok`)
+                      .join(" · ")}
+                  </div>
+                )}
               </div>
             </button>
           ))}
