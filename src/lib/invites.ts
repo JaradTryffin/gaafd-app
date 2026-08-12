@@ -87,6 +87,14 @@ export async function createClubAndInviteAdmin(
     .single();
   if (clubError) throw clubError;
 
+  const { error: categoriesError } = await admin.from("product_categories").insert(
+    ["Flower", "Pre-rolls", "Edibles", "Concentrate", "Accessory"].map((name) => ({ club_id: club.id, name })),
+  );
+  if (categoriesError) {
+    await admin.from("clubs").delete().eq("id", club.id);
+    throw categoriesError;
+  }
+
   try {
     const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
       input.adminEmail,
