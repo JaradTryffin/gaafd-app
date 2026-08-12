@@ -108,7 +108,7 @@ describe("cross-club isolation: cannot write into the other club's tenant tables
           } else if (table === "products") {
             Object.assign(row, {
               name: "Intruder Product",
-              category: "Flower",
+              category_id: dir.other().categoryId,
               unit: "each",
               token_price: 1,
               sell_price: 1,
