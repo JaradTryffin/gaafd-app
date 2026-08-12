@@ -27,6 +27,16 @@ const FLAG_CHIP_LABELS: Record<string, string> = {
 
 type PriceTierDraft = { minQty: string; unitPrice: string };
 
+function dedupeTiersByMinQty(
+  tiers: { minQty: number; unitPrice: number }[],
+): { minQty: number; unitPrice: number }[] {
+  const byMinQty = new Map<number, number>();
+  for (const tier of tiers) {
+    byMinQty.set(tier.minQty, tier.unitPrice);
+  }
+  return Array.from(byMinQty, ([minQty, unitPrice]) => ({ minQty, unitPrice }));
+}
+
 type ProductDraft = {
   name: string;
   category: ProductCategory;
@@ -157,9 +167,11 @@ export function ProductsTable({ clubId, products: initialProducts }: { clubId: s
         cost: draft.cost === "" ? null : Number(draft.cost),
         description: draft.description || null,
         flags: draft.flags,
-        priceTiers: draft.priceTiers
-          .map((t) => ({ minQty: Number(t.minQty) || 0, unitPrice: Number(t.unitPrice) || 0 }))
-          .filter((t) => t.minQty > 0 && t.unitPrice > 0),
+        priceTiers: dedupeTiersByMinQty(
+          draft.priceTiers
+            .map((t) => ({ minQty: Number(t.minQty) || 0, unitPrice: Number(t.unitPrice) || 0 }))
+            .filter((t) => t.minQty > 0 && t.unitPrice > 0),
+        ),
       };
       const result =
         modalMode === "create"
