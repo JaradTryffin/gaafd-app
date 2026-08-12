@@ -39,12 +39,20 @@ afterAll(async () => {
 
 async function seedProduct(clubId: string, tokenPrice: number, stock: number) {
   const admin = createAdminClient();
+  const { data: category, error: categoryError } = await admin
+    .from("product_categories")
+    .select("id")
+    .eq("club_id", clubId)
+    .limit(1)
+    .single();
+  if (categoryError) throw categoryError;
+
   const { data: product, error } = await admin
     .from("products")
     .insert({
       club_id: clubId,
       name: `Dispense Test Product ${crypto.randomUUID().slice(0, 8)}`,
-      category: "Flower",
+      category_id: category.id,
       unit: "per 1g",
       token_price: tokenPrice,
       sell_price: tokenPrice * 1.5,

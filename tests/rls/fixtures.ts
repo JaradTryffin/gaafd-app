@@ -14,6 +14,7 @@ export type SeededClub = {
   contractTemplateId: string;
   signedContractId: string;
   signaturePath: string;
+  categoryId: string;
 };
 
 export type SeededData = {
@@ -82,12 +83,19 @@ async function seedClub(admin: SupabaseClient, label: string): Promise<SeededClu
     .single();
   if (memberError) throw memberError;
 
+  const { data: category, error: categoryError } = await admin
+    .from("product_categories")
+    .insert({ club_id: club.id, name: "Flower" })
+    .select()
+    .single();
+  if (categoryError) throw categoryError;
+
   const { data: product, error: productError } = await admin
     .from("products")
     .insert({
       club_id: club.id,
       name: "Test Product",
-      category: "Flower",
+      category_id: category.id,
       unit: "per 1g",
       token_price: 45,
       sell_price: 60,
@@ -173,6 +181,7 @@ async function seedClub(admin: SupabaseClient, label: string): Promise<SeededClu
     contractTemplateId: template.id,
     signedContractId: signedContract.id,
     signaturePath,
+    categoryId: category.id,
   };
 }
 

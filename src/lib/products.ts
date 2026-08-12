@@ -1,14 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { assertClubAdmin } from "@/lib/auth/require-role";
 
-export type ProductCategory = "Flower" | "Pre-rolls" | "Edibles" | "Concentrate" | "Accessory";
-
 export type PriceTier = { minQty: number; unitPrice: number };
 
 export type Product = {
   id: string;
   name: string;
-  category: ProductCategory;
+  categoryId: string;
+  categoryName: string;
   unit: string;
   tokenPrice: number;
   sellPrice: number;
@@ -23,7 +22,7 @@ export type Product = {
 type ProductRow = {
   id: string;
   name: string;
-  category: string;
+  category_id: string;
   unit: string;
   token_price: number;
   sell_price: number;
@@ -34,11 +33,12 @@ type ProductRow = {
   active: boolean;
 };
 
-function mapProduct(row: ProductRow, stock: number): Product {
+function mapProduct(row: ProductRow, stock: number, categoryName: string): Product {
   return {
     id: row.id,
     name: row.name,
-    category: row.category as ProductCategory,
+    categoryId: row.category_id,
+    categoryName,
     unit: row.unit,
     tokenPrice: row.token_price,
     sellPrice: Number(row.sell_price),
@@ -51,7 +51,7 @@ function mapProduct(row: ProductRow, stock: number): Product {
   };
 }
 
-const PRODUCT_COLUMNS = "id, name, category, unit, token_price, sell_price, cost, description, flags, price_tiers, active";
+const PRODUCT_COLUMNS = "id, name, category_id, unit, token_price, sell_price, cost, description, flags, price_tiers, active";
 
 export async function getProducts(supabase: SupabaseClient, clubId: string): Promise<Product[]> {
   const { data: products, error: productsError } = await supabase
@@ -78,12 +78,26 @@ export async function getProducts(supabase: SupabaseClient, clubId: string): Pro
     (stockRows ?? []).map((r) => [r.product_id as string, r.stock as number]),
   );
 
-  return rows.map((row) => mapProduct(row as ProductRow, stockByProductId.get(row.id as string) ?? 0));
+  const categoryIds = [...new Set(rows.map((r) => r.category_id as string))];
+  const { data: categories, error: categoriesError } = await supabase
+    .from("product_categories")
+    .select("id, name")
+    .in("id", categoryIds);
+  if (categoriesError) throw categoriesError;
+  const categoryNameById = new Map((categories ?? []).map((c) => [c.id as string, c.name as string]));
+
+  return rows.map((row) =>
+    mapProduct(
+      row as ProductRow,
+      stockByProductId.get(row.id as string) ?? 0,
+      categoryNameById.get(row.category_id as string) ?? "—",
+    ),
+  );
 }
 
 export type ProductInput = {
   name: string;
-  category: ProductCategory;
+  categoryId: string;
   unit: string;
   tokenPrice: number;
   sellPrice: number;
@@ -104,7 +118,7 @@ export async function createProduct(
     .insert({
       club_id: clubId,
       name: input.name,
-      category: input.category,
+      category_id: input.categoryId,
       unit: input.unit,
       token_price: input.tokenPrice,
       sell_price: input.sellPrice,
@@ -116,7 +130,15 @@ export async function createProduct(
     .select(PRODUCT_COLUMNS)
     .single();
   if (error) throw error;
-  return mapProduct(data as ProductRow, 0);
+
+  const { data: category, error: categoryError } = await supabase
+    .from("product_categories")
+    .select("name")
+    .eq("id", input.categoryId)
+    .single();
+  if (categoryError) throw categoryError;
+
+  return mapProduct(data as ProductRow, 0, category.name as string);
 }
 
 export async function updateProduct(
@@ -130,7 +152,7 @@ export async function updateProduct(
     .from("products")
     .update({
       name: input.name,
-      category: input.category,
+      category_id: input.categoryId,
       unit: input.unit,
       token_price: input.tokenPrice,
       sell_price: input.sellPrice,
@@ -151,7 +173,15 @@ export async function updateProduct(
     .eq("product_id", productId)
     .eq("club_id", clubId)
     .maybeSingle();
-  return mapProduct(data as ProductRow, stockRow?.stock ?? 0);
+
+  const { data: category, error: categoryError } = await supabase
+    .from("product_categories")
+    .select("name")
+    .eq("id", input.categoryId)
+    .single();
+  if (categoryError) throw categoryError;
+
+  return mapProduct(data as ProductRow, stockRow?.stock ?? 0, category.name as string);
 }
 
 export async function hasProductHistory(

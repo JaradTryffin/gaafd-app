@@ -113,7 +113,7 @@ export async function getLowStockAlerts(
 ): Promise<LowStockAlert[]> {
   const { data: products, error: productsError } = await supabase
     .from("products")
-    .select("id, name, category, unit")
+    .select("id, name, category_id, unit")
     .eq("club_id", clubId)
     .eq("active", true);
   if (productsError) throw productsError;
@@ -132,12 +132,20 @@ export async function getLowStockAlerts(
 
   const stockByProductId = new Map((stockRows ?? []).map((r) => [r.product_id as string, r.stock as number]));
 
+  const categoryIds = [...new Set(products.map((p) => p.category_id as string))];
+  const { data: categories, error: categoriesError } = await supabase
+    .from("product_categories")
+    .select("id, name")
+    .in("id", categoryIds);
+  if (categoriesError) throw categoriesError;
+  const categoryNameById = new Map((categories ?? []).map((c) => [c.id as string, c.name as string]));
+
   return products
     .filter((p) => stockByProductId.has(p.id))
     .map((p) => ({
       productId: p.id as string,
       name: p.name as string,
-      category: p.category as string,
+      category: categoryNameById.get(p.category_id as string) ?? "—",
       unit: p.unit as string,
       stock: stockByProductId.get(p.id)!,
     }))

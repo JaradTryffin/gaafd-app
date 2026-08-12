@@ -74,7 +74,7 @@ describe("getProducts", () => {
   it("defaults a product with zero inventory moves to stock 0", async () => {
     const created = await createProduct(clubAClient, data.clubA.clubId, {
       name: "No Moves Product",
-      category: "Flower",
+      categoryId: data.clubA.categoryId,
       unit: "per 1g",
       tokenPrice: 40,
       sellPrice: 50,
@@ -94,7 +94,7 @@ describe("createProduct", () => {
   it("creates a product scoped to the caller's club, active, with the given fields", async () => {
     const created = await createProduct(clubAClient, data.clubA.clubId, {
       name: "New Flower",
-      category: "Flower",
+      categoryId: data.clubA.categoryId,
       unit: "per 1g",
       tokenPrice: 45,
       sellPrice: 60,
@@ -117,7 +117,7 @@ describe("updateProduct", () => {
   it("updates fields without touching stock", async () => {
     const created = await createProduct(clubAClient, data.clubA.clubId, {
       name: "Before Update",
-      category: "Edibles",
+      categoryId: data.clubA.categoryId,
       unit: "each",
       tokenPrice: 20,
       sellPrice: 30,
@@ -128,7 +128,7 @@ describe("updateProduct", () => {
 
     const updated = await updateProduct(clubAClient, data.clubA.clubId, created.id, {
       name: "After Update",
-      category: "Edibles",
+      categoryId: data.clubA.categoryId,
       unit: "each",
       tokenPrice: 25,
       sellPrice: 35,
@@ -146,7 +146,7 @@ describe("updateProduct", () => {
     await expect(
       updateProduct(clubBClient, data.clubB.clubId, data.clubA.productId, {
         name: "Hijacked",
-        category: "Flower",
+        categoryId: data.clubA.categoryId,
         unit: "per 1g",
         tokenPrice: 1,
         sellPrice: 1,
@@ -161,7 +161,7 @@ describe("hasProductHistory / deleteOrDeactivateProduct", () => {
   it("returns false for a product with no inventory moves, and hard-deletes it", async () => {
     const created = await createProduct(clubAClient, data.clubA.clubId, {
       name: "No History",
-      category: "Accessory",
+      categoryId: data.clubA.categoryId,
       unit: "each",
       tokenPrice: 5,
       sellPrice: 10,
@@ -207,7 +207,7 @@ describe("role-based access", () => {
     await expect(
       createProduct(staffClient, data.clubA.clubId, {
         name: "Staff Attempt",
-        category: "Flower",
+        categoryId: data.clubA.categoryId,
         unit: "per 1g",
         tokenPrice: 10,
         sellPrice: 15,
@@ -218,7 +218,7 @@ describe("role-based access", () => {
 
     const product = await createProduct(clubAClient, data.clubA.clubId, {
       name: "Admin Created Product",
-      category: "Flower",
+      categoryId: data.clubA.categoryId,
       unit: "per 1g",
       tokenPrice: 10,
       sellPrice: 15,
@@ -230,7 +230,7 @@ describe("role-based access", () => {
     await expect(
       updateProduct(staffClient, data.clubA.clubId, product.id, {
         name: "Staff Edited",
-        category: "Flower",
+        categoryId: data.clubA.categoryId,
         unit: "per 1g",
         tokenPrice: 20,
         sellPrice: 30,
@@ -241,7 +241,7 @@ describe("role-based access", () => {
 
     const updated = await updateProduct(clubAClient, data.clubA.clubId, product.id, {
       name: "Admin Edited",
-      category: "Flower",
+      categoryId: data.clubA.categoryId,
       unit: "per 1g",
       tokenPrice: 20,
       sellPrice: 30,
@@ -262,7 +262,7 @@ describe("role-based access", () => {
     const { error: insertError } = await staffClient.from("products").insert({
       club_id: data.clubA.clubId,
       name: "Direct REST Bypass Attempt",
-      category: "Flower",
+      category_id: data.clubA.categoryId,
       unit: "per 1g",
       token_price: 10,
       sell_price: 15,
@@ -274,7 +274,7 @@ describe("role-based access", () => {
       .insert({
         club_id: data.clubA.clubId,
         name: "Direct Admin Insert",
-        category: "Flower",
+        category_id: data.clubA.categoryId,
         unit: "per 1g",
         token_price: 10,
         sell_price: 15,
@@ -313,7 +313,7 @@ describe("price tiers", () => {
   it("round-trips priceTiers through createProduct and updateProduct", async () => {
     const created = await createProduct(clubAClient, data.clubA.clubId, {
       name: "Tiered Product",
-      category: "Flower",
+      categoryId: data.clubA.categoryId,
       unit: "per 1g",
       tokenPrice: 150,
       sellPrice: 225,
@@ -325,7 +325,7 @@ describe("price tiers", () => {
 
     const withoutTiers = await createProduct(clubAClient, data.clubA.clubId, {
       name: "Untiered Product",
-      category: "Flower",
+      categoryId: data.clubA.categoryId,
       unit: "per 1g",
       tokenPrice: 40,
       sellPrice: 60,
@@ -337,7 +337,7 @@ describe("price tiers", () => {
 
     const updated = await updateProduct(clubAClient, data.clubA.clubId, created.id, {
       name: "Tiered Product",
-      category: "Flower",
+      categoryId: data.clubA.categoryId,
       unit: "per 1g",
       tokenPrice: 150,
       sellPrice: 225,
