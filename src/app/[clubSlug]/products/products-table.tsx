@@ -8,9 +8,9 @@ import {
   checkProductHistoryAction,
   deleteOrDeactivateProductAction,
 } from "./actions";
-import type { Product, ProductCategory } from "@/lib/products";
+import type { Product } from "@/lib/products";
+import type { ProductCategoryRow } from "@/lib/categories";
 
-const CATEGORIES: ProductCategory[] = ["Flower", "Pre-rolls", "Edibles", "Concentrate", "Accessory"];
 const LOW_STOCK_THRESHOLD = 8;
 
 const FLAG_LABELS: Record<string, string> = {
@@ -39,7 +39,7 @@ function dedupeTiersByMinQty(
 
 type ProductDraft = {
   name: string;
-  category: ProductCategory;
+  categoryId: string;
   unit: string;
   tokenPrice: string;
   sellPrice: string;
@@ -51,7 +51,7 @@ type ProductDraft = {
 
 const EMPTY_DRAFT: ProductDraft = {
   name: "",
-  category: "Flower",
+  categoryId: "",
   unit: "",
   tokenPrice: "",
   sellPrice: "",
@@ -64,7 +64,7 @@ const EMPTY_DRAFT: ProductDraft = {
 function draftFromProduct(product: Product): ProductDraft {
   return {
     name: product.name,
-    category: product.category,
+    categoryId: product.categoryId,
     unit: product.unit,
     tokenPrice: String(product.tokenPrice),
     sellPrice: String(product.sellPrice),
@@ -78,7 +78,15 @@ function draftFromProduct(product: Product): ProductDraft {
   };
 }
 
-export function ProductsTable({ clubId, products: initialProducts }: { clubId: string; products: Product[] }) {
+export function ProductsTable({
+  clubId,
+  products: initialProducts,
+  categories,
+}: {
+  clubId: string;
+  products: Product[];
+  categories: ProductCategoryRow[];
+}) {
   const { showToast } = useToast();
   const [products, setProducts] = useState(initialProducts);
   const [search, setSearch] = useState("");
@@ -108,11 +116,11 @@ export function ProductsTable({ clubId, products: initialProducts }: { clubId: s
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return products.filter((p) => !q || `${p.name} ${p.category}`.toLowerCase().includes(q));
+    return products.filter((p) => !q || `${p.name} ${p.categoryName}`.toLowerCase().includes(q));
   }, [products, search]);
 
   function openCreate() {
-    setDraft(EMPTY_DRAFT);
+    setDraft({ ...EMPTY_DRAFT, categoryId: categories[0]?.id ?? "" });
     setModalMode("create");
     setEditingId(null);
     setSaveError(null);
@@ -157,10 +165,14 @@ export function ProductsTable({ clubId, products: initialProducts }: { clubId: s
       setSaveError("Product name is required");
       return;
     }
+    if (!draft.categoryId) {
+      setSaveError("Select a category (add one first via Manage categories if none exist)");
+      return;
+    }
     startSaving(async () => {
       const input = {
         name: draft.name,
-        category: draft.category,
+        categoryId: draft.categoryId,
         unit: draft.unit,
         tokenPrice: Number(draft.tokenPrice) || 0,
         sellPrice: Number(draft.sellPrice) || 0,
@@ -303,7 +315,7 @@ export function ProductsTable({ clubId, products: initialProducts }: { clubId: s
                     <div className="text-[11px] text-[#9a9e93]">{p.unit}</div>
                   </div>
                 </div>
-                <div className="text-[13px] text-[#4a4e45]">{p.category}</div>
+                <div className="text-[13px] text-[#4a4e45]">{p.categoryName}</div>
                 <div className={"font-mono text-[13px]" + (p.stock <= LOW_STOCK_THRESHOLD ? " text-destructive" : "")}>
                   {p.stock}
                 </div>
@@ -399,14 +411,22 @@ export function ProductsTable({ clubId, products: initialProducts }: { clubId: s
                   </label>
                   <select
                     id="productCategory"
-                    value={draft.category}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, category: e.target.value as ProductCategory }))}
+                    value={draft.categoryId}
+                    onChange={(e) => setDraft((prev) => ({ ...prev, categoryId: e.target.value }))}
                     className="w-full rounded-[9px] border border-input bg-card px-3 py-2.5 text-[13px]"
                   >
-                    {CATEGORIES.map((c) => (
-                      <option key={c}>{c}</option>
+                    {categories.length === 0 && <option value="">No categories yet</option>}
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
                     ))}
                   </select>
+                  {categories.length === 0 && (
+                    <p className="mt-1 text-[11px] text-[#9a9e93]">
+                      Add a category first via Manage categories above.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="productUnit" className="mb-1 block text-[11px] text-[#8a8e83]">

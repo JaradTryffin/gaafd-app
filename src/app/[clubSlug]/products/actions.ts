@@ -10,6 +10,7 @@ import {
   type ProductInput,
   type DeleteOrDeactivateResult,
 } from "@/lib/products";
+import { createCategory, renameCategory, deleteCategory, type ProductCategoryRow } from "@/lib/categories";
 
 export async function createProductAction(
   clubId: string,
@@ -61,5 +62,45 @@ export async function deleteOrDeactivateProductAction(
     return { ok: true, result };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to delete or deactivate product" };
+  }
+}
+
+export async function createCategoryAction(
+  clubId: string,
+  name: string,
+): Promise<{ ok: true; category: ProductCategoryRow } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  try {
+    const category = await createCategory(supabase, clubId, name);
+    return { ok: true, category };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to add category" };
+  }
+}
+
+export async function renameCategoryAction(
+  clubId: string,
+  categoryId: string,
+  name: string,
+): Promise<{ ok: true; category: ProductCategoryRow } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  try {
+    const category = await renameCategory(supabase, clubId, categoryId, name);
+    return { ok: true, category };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to rename category" };
+  }
+}
+
+export async function deleteCategoryAction(
+  clubId: string,
+  categoryId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  try {
+    await deleteCategory(supabase, clubId, categoryId);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to delete category" };
   }
 }

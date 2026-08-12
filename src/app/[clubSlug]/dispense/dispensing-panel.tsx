@@ -3,30 +3,24 @@
 import { useMemo, useState, useTransition } from "react";
 import { useToast } from "@/lib/toast-context";
 import { createDispenseOrderAction } from "./actions";
-import { effectiveUnitPrice, type Product, type ProductCategory } from "@/lib/products";
+import { effectiveUnitPrice, type Product } from "@/lib/products";
+import type { ProductCategoryRow } from "@/lib/categories";
 import type { MemberListRow } from "@/lib/members";
-
-const CATEGORIES: (ProductCategory | "All")[] = [
-  "All",
-  "Flower",
-  "Pre-rolls",
-  "Edibles",
-  "Concentrate",
-  "Accessory",
-];
 
 export function DispensingPanel({
   clubId,
   products: initialProducts,
   members,
+  categories,
 }: {
   clubId: string;
   products: Product[];
   members: MemberListRow[];
+  categories: ProductCategoryRow[];
 }) {
   const { showToast } = useToast();
   const [products, setProducts] = useState(initialProducts);
-  const [categoryFilter, setCategoryFilter] = useState<ProductCategory | "All">("All");
+  const [categoryFilter, setCategoryFilter] = useState<string>("All");
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -35,8 +29,10 @@ export function DispensingPanel({
 
   const selectedMember = members.find((m) => m.id === selectedMemberId) ?? null;
 
+  const categoryChips = useMemo(() => ["All", ...categories.map((c) => c.name)], [categories]);
+
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => p.active && (categoryFilter === "All" || p.category === categoryFilter));
+    return products.filter((p) => p.active && (categoryFilter === "All" || p.categoryName === categoryFilter));
   }, [products, categoryFilter]);
 
   const memberResults = useMemo(() => {
@@ -189,7 +185,7 @@ export function DispensingPanel({
         )}
 
         <div className="mb-3 flex flex-wrap gap-[7px]">
-          {CATEGORIES.map((c) => (
+          {categoryChips.map((c) => (
             <button
               key={c}
               type="button"
@@ -215,7 +211,7 @@ export function DispensingPanel({
               className="overflow-hidden rounded-[13px] border border-border bg-card text-left"
             >
               <div className="flex h-[78px] items-center justify-center bg-accent font-mono text-[10px] text-[#8ba690]">
-                {p.category}
+                {p.categoryName}
               </div>
               <div className="px-3 py-2.5">
                 <div className="text-[13px] font-semibold leading-tight">{p.name}</div>

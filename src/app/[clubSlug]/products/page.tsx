@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveClubAccess } from "@/lib/auth/club-access";
 import { getProducts } from "@/lib/products";
+import { getCategories } from "@/lib/categories";
 import { ProductsHeader } from "./products-header";
 import { ProductsTable } from "./products-table";
+import { CategoriesPanel } from "./categories-panel";
 
 export default async function ProductsPage({
   params,
@@ -16,12 +18,16 @@ export default async function ProductsPage({
   if (!access) notFound();
   if (access.role !== "admin") notFound();
 
-  const products = await getProducts(supabase, access.clubId);
+  const [products, categories] = await Promise.all([
+    getProducts(supabase, access.clubId),
+    getCategories(supabase, access.clubId),
+  ]);
 
   return (
     <>
       <ProductsHeader clubName={access.name} count={products.length} />
-      <ProductsTable clubId={access.clubId} products={products} />
+      <CategoriesPanel clubId={access.clubId} categories={categories} />
+      <ProductsTable clubId={access.clubId} products={products} categories={categories} />
     </>
   );
 }
