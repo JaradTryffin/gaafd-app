@@ -76,6 +76,46 @@ describe("createCategory", () => {
     cleanupCategoryIds.push(category.id);
     expect(category.name).toBe("Merch");
   });
+
+  it("RLS itself rejects a direct staff INSERT on product_categories, bypassing assertClubAdmin entirely", async () => {
+    const { error: staffInsertError } = await staffClient.from("product_categories").insert({
+      club_id: data.clubA.clubId,
+      name: "Direct REST Bypass Attempt",
+    });
+    expect(staffInsertError).not.toBeNull();
+
+    const { data: adminCategory, error: adminInsertError } = await clubAClient
+      .from("product_categories")
+      .insert({ club_id: data.clubA.clubId, name: "Direct Admin Insert" })
+      .select()
+      .single();
+    expect(adminInsertError).toBeNull();
+    cleanupCategoryIds.push(adminCategory!.id);
+
+    const { error: staffUpdateError } = await staffClient
+      .from("product_categories")
+      .update({ name: "Staff Direct Update Attempt" })
+      .eq("id", adminCategory!.id);
+    void staffUpdateError;
+    const { data: afterStaffUpdate } = await clubAClient
+      .from("product_categories")
+      .select("name")
+      .eq("id", adminCategory!.id)
+      .single();
+    expect(afterStaffUpdate!.name).toBe("Direct Admin Insert");
+
+    const { error: staffDeleteError } = await staffClient
+      .from("product_categories")
+      .delete()
+      .eq("id", adminCategory!.id);
+    void staffDeleteError;
+    const { data: stillExists } = await clubAClient
+      .from("product_categories")
+      .select("id")
+      .eq("id", adminCategory!.id)
+      .maybeSingle();
+    expect(stillExists).not.toBeNull();
+  });
 });
 
 describe("renameCategory", () => {

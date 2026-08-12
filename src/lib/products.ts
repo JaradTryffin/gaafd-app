@@ -135,6 +135,7 @@ export async function createProduct(
     .from("product_categories")
     .select("name")
     .eq("id", input.categoryId)
+    .eq("club_id", clubId)
     .single();
   if (categoryError) throw categoryError;
 
@@ -178,6 +179,7 @@ export async function updateProduct(
     .from("product_categories")
     .select("name")
     .eq("id", input.categoryId)
+    .eq("club_id", clubId)
     .single();
   if (categoryError) throw categoryError;
 
