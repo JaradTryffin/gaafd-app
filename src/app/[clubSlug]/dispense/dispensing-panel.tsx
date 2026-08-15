@@ -81,6 +81,14 @@ export function DispensingPanel({
       }
       return next;
     });
+    setGiftLines((prev) => {
+      const qty = (cart[productId] ?? 0) + delta;
+      if (qty > 0) return prev;
+      if (!(productId in prev)) return prev;
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
   }
 
   function selectMember(memberId: string) {
