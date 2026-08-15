@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type CartItem = { productId: string; qty: number };
+export type CartItem = { productId: string; qty: number; isGift?: boolean; giftReason?: string | null };
 
 export type DispenseOrderItem = {
   productId: string;
@@ -9,6 +9,8 @@ export type DispenseOrderItem = {
   qty: number;
   tokenPrice: number;
   lineTotal: number;
+  isGift: boolean;
+  giftReason: string | null;
 };
 
 export type DispenseOrder = {
@@ -36,7 +38,12 @@ export async function createDispenseOrder(
   const { data, error } = await supabase.rpc("create_dispense_order", {
     p_club_id: clubId,
     p_member_id: memberId,
-    p_items: items.map((i) => ({ product_id: i.productId, qty: i.qty })),
+    p_items: items.map((i) => ({
+      product_id: i.productId,
+      qty: i.qty,
+      is_gift: i.isGift ?? false,
+      gift_reason: i.giftReason ?? null,
+    })),
   });
   if (error) throw error;
 

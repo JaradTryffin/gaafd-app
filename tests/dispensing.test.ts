@@ -301,3 +301,76 @@ describe("bulk pricing", () => {
     expect(order.items[0].tokenPrice).toBe(100);
   });
 });
+
+describe("gifting", () => {
+  it("checks out a gift-only order at tokenTotal 0, decrements stock, leaves balance unchanged", async () => {
+    const product = await seedProduct(data.clubA.clubId, 150, 50);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 1000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: product.id, qty: 1, isGift: true, giftReason: "Loyalty" },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.tokenTotal).toBe(0);
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0].isGift).toBe(true);
+    expect(order.items[0].giftReason).toBe("Loyalty");
+    expect(order.items[0].tokenPrice).toBe(150);
+    expect(order.items[0].lineTotal).toBe(150);
+
+    expect(await getStock(product.id)).toBe(49);
+    expect(await getBalance(member.id)).toBe(1000);
+  });
+
+  it("charges only the paid line in a mixed paid+gift order, both lines decrement stock", async () => {
+    const paidProduct = await seedProduct(data.clubA.clubId, 40, 50);
+    const giftProduct = await seedProduct(data.clubA.clubId, 60, 30);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 1000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: paidProduct.id, qty: 2 },
+      { productId: giftProduct.id, qty: 1, isGift: true, giftReason: null },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.tokenTotal).toBe(80);
+    const paidItem = order.items.find((i) => i.productId === paidProduct.id);
+    const giftItem = order.items.find((i) => i.productId === giftProduct.id);
+    expect(paidItem?.isGift).toBe(false);
+    expect(paidItem?.lineTotal).toBe(80);
+    expect(giftItem?.isGift).toBe(true);
+    expect(giftItem?.lineTotal).toBe(60);
+
+    expect(await getStock(paidProduct.id)).toBe(48);
+    expect(await getStock(giftProduct.id)).toBe(29);
+    expect(await getBalance(member.id)).toBe(1000 - 80);
+  });
+
+  it("succeeds for an all-gift order even at zero balance", async () => {
+    const product = await seedProduct(data.clubA.clubId, 200, 10);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 0);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: product.id, qty: 1, isGift: true },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.tokenTotal).toBe(0);
+    expect(await getStock(product.id)).toBe(9);
+    expect(await getBalance(member.id)).toBe(0);
+  });
+
+  it("a normal order with no gift lines has isGift:false on every item (regression)", async () => {
+    const product = await seedProduct(data.clubA.clubId, 40, 50);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 1000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: product.id, qty: 3 },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.items[0].isGift).toBe(false);
+    expect(order.items[0].giftReason).toBeNull();
+  });
+});
