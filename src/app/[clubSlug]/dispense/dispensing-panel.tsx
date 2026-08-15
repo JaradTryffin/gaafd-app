@@ -24,6 +24,7 @@ export function DispensingPanel({
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
+  const [giftLines, setGiftLines] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [isCheckingOut, startCheckingOut] = useTransition();
 
@@ -46,16 +47,22 @@ export function DispensingPanel({
   const cartLines = Object.entries(cart).map(([productId, qty]) => {
     const product = productById.get(productId);
     const tokenPrice = product ? effectiveUnitPrice(product.tokenPrice, product.priceTiers, qty) : 0;
+    const isGift = productId in giftLines;
+    const lineTotal = tokenPrice * qty;
     return {
       productId,
       qty,
       name: product?.name ?? "—",
       tokenPrice,
-      lineTotal: tokenPrice * qty,
+      lineTotal,
+      isGift,
+      giftReason: giftLines[productId] ?? "",
+      chargedTotal: isGift ? 0 : lineTotal,
     };
   });
   const cartCount = cartLines.reduce((sum, l) => sum + l.qty, 0);
-  const cartTotal = cartLines.reduce((sum, l) => sum + l.lineTotal, 0);
+  const cartTotal = cartLines.reduce((sum, l) => sum + l.chargedTotal, 0);
+  const giftCount = cartLines.filter((l) => l.isGift).length;
   const balanceAfter = selectedMember ? selectedMember.tokenBalance - cartTotal : null;
   const canCheckout = Boolean(selectedMember) && cartCount > 0 && (balanceAfter ?? -1) >= 0;
 
@@ -81,6 +88,21 @@ export function DispensingPanel({
     setMemberSearch("");
   }
 
+  function toggleGift(productId: string) {
+    setGiftLines((prev) => {
+      if (productId in prev) {
+        const next = { ...prev };
+        delete next[productId];
+        return next;
+      }
+      return { ...prev, [productId]: "" };
+    });
+  }
+
+  function setGiftReason(productId: string, reason: string) {
+    setGiftLines((prev) => (productId in prev ? { ...prev, [productId]: reason } : prev));
+  }
+
   function handleCheckout() {
     setError(null);
     if (!selectedMember) {
@@ -95,7 +117,12 @@ export function DispensingPanel({
       setError("Not enough tokens for this order");
       return;
     }
-    const items = cartLines.map((l) => ({ productId: l.productId, qty: l.qty }));
+    const items = cartLines.map((l) => ({
+      productId: l.productId,
+      qty: l.qty,
+      isGift: l.isGift,
+      giftReason: l.giftReason || null,
+    }));
     startCheckingOut(async () => {
       const result = await createDispenseOrderAction(clubId, selectedMember.id, items);
       if (!result.ok) {
@@ -112,6 +139,7 @@ export function DispensingPanel({
         `Dispensed · ${cartCount} item(s), ${selectedMember.tokenBalance - result.order.tokenTotal} tokens remaining`,
       );
       setCart({});
+      setGiftLines({});
       setSelectedMemberId(null);
     });
   }
@@ -254,31 +282,67 @@ export function DispensingPanel({
             </div>
           ) : (
             cartLines.map((l) => (
-              <div key={l.productId} className="flex items-center gap-2.5 border-b border-[#f4f2ea] py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium">{l.name}</div>
-                  <div className="font-mono text-[11px] text-[#8a8e83]">
-                    {l.tokenPrice} × {l.qty}
+              <div key={l.productId} className="border-b border-[#f4f2ea] py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-medium">{l.name}</div>
+                    <div className="font-mono text-[11px] text-[#8a8e83]">
+                      {l.tokenPrice} × {l.qty}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => changeQty(l.productId, -1)}
+                      className="h-6 w-6 rounded-[6px] border border-input bg-muted text-[14px] text-[#6b6f66]"
+                    >
+                      −
+                    </button>
+                    <div className="w-[22px] text-center font-mono text-[13px]">{l.qty}</div>
+                    <button
+                      type="button"
+                      onClick={() => changeQty(l.productId, 1)}
+                      className="h-6 w-6 rounded-[6px] border border-input bg-muted text-[14px] text-[#6b6f66]"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleGift(l.productId)}
+                    title={l.isGift ? "Remove gift" : "Mark as gift"}
+                    className="flex h-6 w-6 flex-none items-center justify-center rounded-[6px] border text-[13px]"
+                    style={
+                      l.isGift
+                        ? { background: "var(--primary)", borderColor: "var(--primary)", color: "#fff" }
+                        : { background: "var(--card)", borderColor: "var(--border)", color: "#8a8e83" }
+                    }
+                  >
+                    🎁
+                  </button>
+                  <div
+                    className={
+                      "w-[52px] text-right font-mono text-[13px] font-semibold" +
+                      (l.isGift ? " text-[#9a9e93] line-through" : "")
+                    }
+                  >
+                    {l.lineTotal}
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => changeQty(l.productId, -1)}
-                    className="h-6 w-6 rounded-[6px] border border-input bg-muted text-[14px] text-[#6b6f66]"
-                  >
-                    −
-                  </button>
-                  <div className="w-[22px] text-center font-mono text-[13px]">{l.qty}</div>
-                  <button
-                    type="button"
-                    onClick={() => changeQty(l.productId, 1)}
-                    className="h-6 w-6 rounded-[6px] border border-input bg-muted text-[14px] text-[#6b6f66]"
-                  >
-                    +
-                  </button>
-                </div>
-                <div className="w-[52px] text-right font-mono text-[13px] font-semibold">{l.lineTotal}</div>
+                {l.isGift && (
+                  <div className="mt-1.5">
+                    <label htmlFor={`giftReason-${l.productId}`} className="sr-only">
+                      Gift reason
+                    </label>
+                    <input
+                      id={`giftReason-${l.productId}`}
+                      value={l.giftReason}
+                      onChange={(e) => setGiftReason(l.productId, e.target.value)}
+                      placeholder="Reason (optional)"
+                      className="w-full rounded-[6px] border border-input px-2 py-1 text-[11.5px]"
+                    />
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -288,6 +352,11 @@ export function DispensingPanel({
             <span>Items</span>
             <span className="font-mono">{cartCount}</span>
           </div>
+          {giftCount > 0 && (
+            <div className="mb-1.5 flex justify-between text-[12.5px] text-primary">
+              <span>Includes {giftCount} gift{giftCount > 1 ? "s" : ""}</span>
+            </div>
+          )}
           <div className="mb-1.5 flex items-center justify-between">
             <span className="font-semibold">Total tokens</span>
             <span className="font-mono text-xl font-semibold text-primary">{cartTotal}</span>
