@@ -37,7 +37,7 @@ afterAll(async () => {
   }
 }, 30000);
 
-async function seedProduct(clubId: string, tokenPrice: number, stock: number) {
+async function seedProduct(clubId: string, tokenPrice: number, stock: number, flags: string[] = []) {
   const admin = createAdminClient();
   const { data: category, error: categoryError } = await admin
     .from("product_categories")
@@ -56,6 +56,7 @@ async function seedProduct(clubId: string, tokenPrice: number, stock: number) {
       unit: "per 1g",
       token_price: tokenPrice,
       sell_price: tokenPrice * 1.5,
+      flags,
     })
     .select()
     .single();
@@ -304,7 +305,7 @@ describe("bulk pricing", () => {
 
 describe("gifting", () => {
   it("checks out a gift-only order at tokenTotal 0, decrements stock, leaves balance unchanged", async () => {
-    const product = await seedProduct(data.clubA.clubId, 150, 50);
+    const product = await seedProduct(data.clubA.clubId, 150, 50, ["gift"]);
     const member = await seedMemberWithBalance(data.clubA.clubId, 1000);
 
     const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
@@ -325,7 +326,7 @@ describe("gifting", () => {
 
   it("charges only the paid line in a mixed paid+gift order, both lines decrement stock", async () => {
     const paidProduct = await seedProduct(data.clubA.clubId, 40, 50);
-    const giftProduct = await seedProduct(data.clubA.clubId, 60, 30);
+    const giftProduct = await seedProduct(data.clubA.clubId, 60, 30, ["gift"]);
     const member = await seedMemberWithBalance(data.clubA.clubId, 1000);
 
     const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
@@ -348,7 +349,7 @@ describe("gifting", () => {
   });
 
   it("succeeds for an all-gift order even at zero balance", async () => {
-    const product = await seedProduct(data.clubA.clubId, 200, 10);
+    const product = await seedProduct(data.clubA.clubId, 200, 10, ["gift"]);
     const member = await seedMemberWithBalance(data.clubA.clubId, 0);
 
     const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
@@ -372,5 +373,32 @@ describe("gifting", () => {
 
     expect(order.items[0].isGift).toBe(false);
     expect(order.items[0].giftReason).toBeNull();
+  });
+
+  it("rejects a gift line for a product without the gift flag", async () => {
+    const product = await seedProduct(data.clubA.clubId, 40, 50);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 1000);
+
+    await expect(
+      createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+        { productId: product.id, qty: 1, isGift: true },
+      ]),
+    ).rejects.toThrow("is not marked as giftable");
+
+    expect(await getStock(product.id)).toBe(50);
+    expect(await getBalance(member.id)).toBe(1000);
+  });
+
+  it("succeeds and records staffEmail for a gift line on a flagged product", async () => {
+    const product = await seedProduct(data.clubA.clubId, 40, 50, ["gift"]);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 1000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: product.id, qty: 1, isGift: true },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.tokenTotal).toBe(0);
+    expect(order.staffEmail).toBe(data.clubA.adminEmail);
   });
 });

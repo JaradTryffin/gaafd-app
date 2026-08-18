@@ -17,6 +17,7 @@ export type DispenseOrder = {
   id: string;
   memberId: string;
   tokenTotal: number;
+  staffEmail: string | null;
   items: DispenseOrderItem[];
   createdAt: string;
 };
@@ -25,6 +26,7 @@ type DispenseOrderRow = {
   id: string;
   member_id: string;
   token_total: number;
+  staff_email: string | null;
   items: DispenseOrderItem[];
   created_at: string;
 };
@@ -35,6 +37,11 @@ export async function createDispenseOrder(
   memberId: string,
   items: CartItem[],
 ): Promise<DispenseOrder> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
   const { data, error } = await supabase.rpc("create_dispense_order", {
     p_club_id: clubId,
     p_member_id: memberId,
@@ -44,6 +51,7 @@ export async function createDispenseOrder(
       is_gift: i.isGift ?? false,
       gift_reason: i.giftReason ?? null,
     })),
+    p_staff_email: user.email ?? null,
   });
   if (error) throw error;
 
@@ -55,6 +63,7 @@ export async function createDispenseOrder(
     id: row.id,
     memberId: row.member_id,
     tokenTotal: row.token_total,
+    staffEmail: row.staff_email,
     items: row.items,
     createdAt: row.created_at,
   };
