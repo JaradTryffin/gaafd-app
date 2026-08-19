@@ -23,6 +23,7 @@ const NAV_GROUPS = [
     items: [
       { key: "donations", label: "Donations", path: "/donations", dot: "var(--tenant-accent-5)" },
       { key: "till", label: "Till & shifts", path: "/till", dot: "var(--tenant-accent-4)" },
+      { key: "orders", label: "Order history", path: "/orders", dot: "var(--tenant-accent-5)", adminOnly: true },
     ],
   },
   {

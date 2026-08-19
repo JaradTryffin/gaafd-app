@@ -56,6 +56,7 @@ export function DispensingPanel({
       tokenPrice,
       lineTotal,
       isGift,
+      isGiftable: product?.flags.includes("gift") ?? false,
       giftReason: giftLines[productId] ?? "",
       chargedTotal: isGift ? 0 : lineTotal,
     };
@@ -315,19 +316,21 @@ export function DispensingPanel({
                       +
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => toggleGift(l.productId)}
-                    title={l.isGift ? "Remove gift" : "Mark as gift"}
-                    className="flex h-6 w-6 flex-none items-center justify-center rounded-[6px] border text-[13px]"
-                    style={
-                      l.isGift
-                        ? { background: "var(--primary)", borderColor: "var(--primary)", color: "#fff" }
-                        : { background: "var(--card)", borderColor: "var(--border)", color: "#8a8e83" }
-                    }
-                  >
-                    🎁
-                  </button>
+                  {l.isGiftable && (
+                    <button
+                      type="button"
+                      onClick={() => toggleGift(l.productId)}
+                      title={l.isGift ? "Remove gift" : "Mark as gift"}
+                      className="flex h-6 w-6 flex-none items-center justify-center rounded-[6px] border text-[13px]"
+                      style={
+                        l.isGift
+                          ? { background: "var(--primary)", borderColor: "var(--primary)", color: "#fff" }
+                          : { background: "var(--card)", borderColor: "var(--border)", color: "#8a8e83" }
+                      }
+                    >
+                      🎁
+                    </button>
+                  )}
                   <div
                     className={
                       "w-[52px] text-right font-mono text-[13px] font-semibold" +
