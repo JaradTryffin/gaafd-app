@@ -5,8 +5,10 @@ import {
   getDashboardKpis,
   getLowStockAlerts,
   getRecentActivity,
+  getTokensDispensedLast7Days,
   type ActivityItem,
   type LowStockAlert,
+  type TokenDispenseDay,
 } from "@/lib/dashboard";
 import { formatRand, formatRelativeTime } from "@/lib/format";
 import { DashboardHeader } from "./dashboard-header";
@@ -22,10 +24,11 @@ export default async function DashboardPage({
   if (!access) notFound();
   if (access.role !== "admin") redirect(`/${clubSlug}/dispense`);
 
-  const [kpis, lowStockAlerts, activity] = await Promise.all([
+  const [kpis, lowStockAlerts, activity, tokensLast7Days] = await Promise.all([
     getDashboardKpis(supabase, access.clubId),
     getLowStockAlerts(supabase, access.clubId, 5),
     getRecentActivity(supabase, access.clubId, 8),
+    getTokensDispensedLast7Days(supabase, access.clubId),
   ]);
 
   return (
@@ -63,9 +66,7 @@ export default async function DashboardPage({
           <KpiCard
             label="Tokens dispensed today"
             dotColor="#e0996a"
-            value="—"
-            delta="Available once Dispensing ships"
-            deltaColor="#8a8e83"
+            value={String(kpis.tokensDispensedToday)}
           />
         </div>
 
@@ -74,9 +75,13 @@ export default async function DashboardPage({
             <div className="mb-3.5 font-heading text-[15px] font-semibold">
               Tokens dispensed · last 7 days
             </div>
-            <div className="flex h-[180px] items-center justify-center px-4 text-center text-[12.5px] text-[#9a9e93]">
-              No dispensing activity yet — this fills in once the Dispensing screen is live.
-            </div>
+            {tokensLast7Days.every((d) => d.tokens === 0) ? (
+              <div className="flex h-[180px] items-center justify-center px-4 text-center text-[12.5px] text-[#9a9e93]">
+                No dispensing activity in the last 7 days.
+              </div>
+            ) : (
+              <TokensChart days={tokensLast7Days} />
+            )}
           </div>
 
           <div className="rounded-card border border-border bg-card p-[18px]">
@@ -133,6 +138,24 @@ function KpiCard({
           {delta}
         </div>
       )}
+    </div>
+  );
+}
+
+function TokensChart({ days }: { days: TokenDispenseDay[] }) {
+  const max = Math.max(1, ...days.map((d) => d.tokens));
+  return (
+    <div className="flex h-[180px] items-end gap-2.5 px-1">
+      {days.map((d, i) => (
+        <div key={`${d.label}-${i}`} className="flex flex-1 flex-col items-center gap-1.5">
+          <div className="font-mono text-[11px] text-[#9a9e93]">{d.tokens > 0 ? d.tokens : ""}</div>
+          <div
+            className="w-full rounded-t-[4px]"
+            style={{ height: `${Math.max(4, (d.tokens / max) * 110)}px`, background: "#e0996a" }}
+          />
+          <div className="text-[10.5px] text-[#9a9e93]">{d.label}</div>
+        </div>
+      ))}
     </div>
   );
 }

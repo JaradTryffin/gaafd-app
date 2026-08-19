@@ -40,3 +40,14 @@ export function sastMonthStart(): string {
   const startMs = Date.UTC(sastYear, sastMonth, 1) - SAST_OFFSET_MS;
   return new Date(startMs).toISOString();
 }
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export function sastWeekdayLabel(daysAgo: number): string {
+  const shifted = new Date(Date.now() + SAST_OFFSET_MS);
+  const sastYear = shifted.getUTCFullYear();
+  const sastMonth = shifted.getUTCMonth();
+  const sastDate = shifted.getUTCDate();
+  const dayMs = Date.UTC(sastYear, sastMonth, sastDate - daysAgo);
+  return WEEKDAY_LABELS[new Date(dayMs).getUTCDay()];
+}

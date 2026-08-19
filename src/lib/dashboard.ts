@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sastDayRange, sastMonthStart } from "@/lib/format";
+import { sastDayRange, sastMonthStart, sastWeekdayLabel } from "@/lib/format";
 
 export const LOW_STOCK_THRESHOLD = 8;
 
@@ -9,6 +9,7 @@ export type DashboardKpis = {
   donationsTodayRand: number;
   donationsDelta: { text: string; positive: boolean } | null;
   lowStockCount: number;
+  tokensDispensedToday: number;
 };
 
 function computeDonationsDelta(
@@ -89,13 +90,52 @@ export async function getDashboardKpis(
     lowStockCount = (stockRows ?? []).length;
   }
 
+  const { data: todayOrders, error: todayOrdersError } = await supabase
+    .from("dispense_orders")
+    .select("token_total")
+    .eq("club_id", clubId)
+    .gte("created_at", today.start)
+    .lt("created_at", today.end);
+  if (todayOrdersError) throw todayOrdersError;
+  const tokensDispensedToday = (todayOrders ?? []).reduce(
+    (sum, o) => sum + Number(o.token_total),
+    0,
+  );
+
   return {
     activeMembers: activeMembers ?? 0,
     newMembersThisMonth: newMembersThisMonth ?? 0,
     donationsTodayRand,
     donationsDelta: computeDonationsDelta(donationsTodayRand, donationsYesterdayRand),
     lowStockCount,
+    tokensDispensedToday,
   };
+}
+
+export type TokenDispenseDay = { label: string; tokens: number };
+
+export async function getTokensDispensedLast7Days(
+  supabase: SupabaseClient,
+  clubId: string,
+): Promise<TokenDispenseDay[]> {
+  const windowStart = sastDayRange(6).start;
+  const windowEnd = sastDayRange(0).end;
+  const { data: orders, error } = await supabase
+    .from("dispense_orders")
+    .select("token_total, created_at")
+    .eq("club_id", clubId)
+    .gte("created_at", windowStart)
+    .lt("created_at", windowEnd);
+  if (error) throw error;
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const daysAgo = 6 - i;
+    const { start, end } = sastDayRange(daysAgo);
+    const tokens = (orders ?? [])
+      .filter((o) => o.created_at >= start && o.created_at < end)
+      .reduce((sum, o) => sum + Number(o.token_total), 0);
+    return { label: sastWeekdayLabel(daysAgo), tokens };
+  });
 }
 
 export type LowStockAlert = {
