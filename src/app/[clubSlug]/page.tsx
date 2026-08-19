@@ -3,10 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveClubAccess } from "@/lib/auth/club-access";
 import {
   getDashboardKpis,
+  getDispensingByCategory,
+  getDonationsTrend,
   getLowStockAlerts,
   getRecentActivity,
   getTokensDispensedLast7Days,
   type ActivityItem,
+  type CategoryShare,
+  type DonationsTrendPoint,
   type LowStockAlert,
   type TokenDispenseDay,
 } from "@/lib/dashboard";
@@ -24,12 +28,15 @@ export default async function DashboardPage({
   if (!access) notFound();
   if (access.role !== "admin") redirect(`/${clubSlug}/dispense`);
 
-  const [kpis, lowStockAlerts, activity, tokensLast7Days] = await Promise.all([
-    getDashboardKpis(supabase, access.clubId),
-    getLowStockAlerts(supabase, access.clubId, 5),
-    getRecentActivity(supabase, access.clubId, 8),
-    getTokensDispensedLast7Days(supabase, access.clubId),
-  ]);
+  const [kpis, lowStockAlerts, activity, tokensLast7Days, donationsTrend, dispensingByCategory] =
+    await Promise.all([
+      getDashboardKpis(supabase, access.clubId),
+      getLowStockAlerts(supabase, access.clubId, 5),
+      getRecentActivity(supabase, access.clubId, 8),
+      getTokensDispensedLast7Days(supabase, access.clubId),
+      getDonationsTrend(supabase, access.clubId),
+      getDispensingByCategory(supabase, access.clubId),
+    ]);
 
   return (
     <>
@@ -96,6 +103,33 @@ export default async function DashboardPage({
           </div>
         </div>
 
+        <div className="mt-4 grid grid-cols-[1.4fr_1fr] gap-4">
+          <div className="rounded-card border border-border bg-card p-[18px]">
+            <div className="mb-3 flex items-center">
+              <div className="font-heading text-[15px] font-semibold">Donations trend</div>
+              <div className="ml-auto font-mono text-[11.5px] text-[#6b6f66]">monthly · ZAR</div>
+            </div>
+            {donationsTrend.every((p) => p.totalRand === 0) ? (
+              <div className="flex h-[160px] items-center justify-center px-4 text-center text-[12.5px] text-[#9a9e93]">
+                No donations in the last 6 months.
+              </div>
+            ) : (
+              <DonationsTrendChart points={donationsTrend} />
+            )}
+          </div>
+
+          <div className="rounded-card border border-border bg-card p-[18px]">
+            <div className="mb-4 font-heading text-[15px] font-semibold">Dispensing by category</div>
+            {dispensingByCategory.length === 0 ? (
+              <div className="flex h-[120px] items-center justify-center text-center text-[12.5px] text-[#9a9e93]">
+                Nothing dispensed in the last 30 days.
+              </div>
+            ) : (
+              <DispensingByCategoryDonut categories={dispensingByCategory} />
+            )}
+          </div>
+        </div>
+
         <div className="mt-4 rounded-card border border-border bg-card p-[18px]">
           <div className="mb-1.5 font-heading text-[15px] font-semibold">Recent activity</div>
           {activity.length === 0 ? (
@@ -156,6 +190,98 @@ function TokensChart({ days }: { days: TokenDispenseDay[] }) {
           <div className="text-[10.5px] text-[#9a9e93]">{d.label}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+const DONUT_PALETTE = ["#3f7a4e", "#8a6d3b", "#4a6b8a", "#7a4a6b", "#6b7a4a"];
+
+function DonationsTrendChart({ points }: { points: DonationsTrendPoint[] }) {
+  const width = 600;
+  const yTop = 15;
+  const yBottom = 170;
+  const max = Math.max(1, ...points.map((p) => p.totalRand));
+  const step = points.length > 1 ? width / (points.length - 1) : 0;
+  const coords = points.map((p, i) => ({
+    x: i * step,
+    y: yBottom - (p.totalRand / max) * (yBottom - yTop),
+  }));
+  const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x},${c.y}`).join(" ");
+  const lastX = coords[coords.length - 1]?.x ?? 0;
+  const firstX = coords[0]?.x ?? 0;
+  const areaPath = `${linePath} L${lastX},${yBottom} L${firstX},${yBottom} Z`;
+
+  return (
+    <>
+      <div className="relative h-[160px] w-full">
+        <svg
+          viewBox="0 0 600 190"
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full"
+        >
+          <path d={areaPath} fill="rgba(47,93,58,.10)" />
+          <path
+            d={linePath}
+            fill="none"
+            stroke="#2f5d3a"
+            strokeWidth={2.5}
+            vectorEffect="non-scaling-stroke"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        </svg>
+        {coords.map((c, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full border-[2.5px] border-[#2f5d3a] bg-white"
+            style={{
+              left: `${(c.x / width) * 100}%`,
+              top: `${(c.y / 190) * 100}%`,
+              width: 9,
+              height: 9,
+              margin: "-4.5px 0 0 -4.5px",
+            }}
+          />
+        ))}
+      </div>
+      <div className="mt-2 flex">
+        {points.map((p, i) => (
+          <div key={i} className="flex-1 text-center text-[11px] text-[#8a8e83]">
+            {p.label}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function DispensingByCategoryDonut({ categories }: { categories: CategoryShare[] }) {
+  let cursor = 0;
+  const stops = categories.map((c, i) => {
+    const color = DONUT_PALETTE[i % DONUT_PALETTE.length];
+    const start = cursor;
+    cursor += c.pct;
+    return `${color} ${start}% ${cursor}%`;
+  });
+  const gradient = `conic-gradient(${stops.join(", ")})`;
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="relative h-[120px] w-[120px] flex-none rounded-full" style={{ background: gradient }}>
+        <div className="absolute inset-6 rounded-full bg-card" />
+      </div>
+      <div className="flex flex-1 flex-col gap-2">
+        {categories.map((c, i) => (
+          <div key={c.label} className="flex items-center gap-2 text-[12px]">
+            <span
+              className="h-[9px] w-[9px] flex-none rounded-[2px]"
+              style={{ background: DONUT_PALETTE[i % DONUT_PALETTE.length] }}
+            />
+            <span className="flex-1 text-[#4a4e45]">{c.label}</span>
+            <span className="font-mono text-[#1c1e1a]">{Math.round(c.pct)}%</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

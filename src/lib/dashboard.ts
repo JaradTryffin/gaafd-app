@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sastDayRange, sastMonthStart, sastWeekdayLabel } from "@/lib/format";
+import {
+  sastDayRange,
+  sastMonthLabel,
+  sastMonthRange,
+  sastMonthStart,
+  sastWeekdayLabel,
+} from "@/lib/format";
+import type { DispenseOrderItem } from "@/lib/dispensing";
 
 export const LOW_STOCK_THRESHOLD = 8;
 
@@ -263,4 +270,88 @@ export async function getRecentActivity(
   return [...donationItems, ...memberItems]
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, limit);
+}
+
+export type DonationsTrendPoint = { label: string; totalRand: number };
+
+export async function getDonationsTrend(
+  supabase: SupabaseClient,
+  clubId: string,
+): Promise<DonationsTrendPoint[]> {
+  const windowStart = sastMonthRange(5).start;
+  const { data: donations, error } = await supabase
+    .from("donations")
+    .select("amount_rand, created_at")
+    .eq("club_id", clubId)
+    .gte("created_at", windowStart);
+  if (error) throw error;
+
+  return Array.from({ length: 6 }, (_, i) => {
+    const monthsAgo = 5 - i;
+    const { start, end } = sastMonthRange(monthsAgo);
+    const totalRand = (donations ?? [])
+      .filter((d) => d.created_at >= start && d.created_at < end)
+      .reduce((sum, d) => sum + Number(d.amount_rand), 0);
+    return { label: sastMonthLabel(monthsAgo), totalRand };
+  });
+}
+
+export type CategoryShare = { label: string; tokens: number; pct: number };
+
+export async function getDispensingByCategory(
+  supabase: SupabaseClient,
+  clubId: string,
+): Promise<CategoryShare[]> {
+  const windowStart = sastDayRange(29).start;
+  const { data: orders, error } = await supabase
+    .from("dispense_orders")
+    .select("items")
+    .eq("club_id", clubId)
+    .gte("created_at", windowStart);
+  if (error) throw error;
+
+  const tokensByProductId = new Map<string, number>();
+  for (const order of orders ?? []) {
+    for (const item of (order.items ?? []) as DispenseOrderItem[]) {
+      tokensByProductId.set(
+        item.productId,
+        (tokensByProductId.get(item.productId) ?? 0) + item.lineTotal,
+      );
+    }
+  }
+
+  const productIds = [...tokensByProductId.keys()];
+  if (productIds.length === 0) return [];
+
+  const { data: products, error: productsError } = await supabase
+    .from("products")
+    .select("id, category_id")
+    .eq("club_id", clubId)
+    .in("id", productIds);
+  if (productsError) throw productsError;
+  const categoryIdByProductId = new Map(
+    (products ?? []).map((p) => [p.id as string, p.category_id as string]),
+  );
+
+  const categoryIds = [...new Set((products ?? []).map((p) => p.category_id as string))];
+  const { data: categories, error: categoriesError } = await supabase
+    .from("product_categories")
+    .select("id, name")
+    .in("id", categoryIds);
+  if (categoriesError) throw categoriesError;
+  const categoryNameById = new Map((categories ?? []).map((c) => [c.id as string, c.name as string]));
+
+  const tokensByCategory = new Map<string, number>();
+  for (const [productId, tokens] of tokensByProductId) {
+    const categoryId = categoryIdByProductId.get(productId);
+    const categoryName = (categoryId && categoryNameById.get(categoryId)) || "Other";
+    tokensByCategory.set(categoryName, (tokensByCategory.get(categoryName) ?? 0) + tokens);
+  }
+
+  const total = [...tokensByCategory.values()].reduce((sum, t) => sum + t, 0);
+  if (total === 0) return [];
+
+  return [...tokensByCategory.entries()]
+    .map(([label, tokens]) => ({ label, tokens, pct: (tokens / total) * 100 }))
+    .sort((a, b) => b.tokens - a.tokens);
 }

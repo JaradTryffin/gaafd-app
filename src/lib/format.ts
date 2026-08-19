@@ -51,3 +51,25 @@ export function sastWeekdayLabel(daysAgo: number): string {
   const dayMs = Date.UTC(sastYear, sastMonth, sastDate - daysAgo);
   return WEEKDAY_LABELS[new Date(dayMs).getUTCDay()];
 }
+
+export function sastMonthRange(monthsAgo: number): { start: string; end: string } {
+  const shifted = new Date(Date.now() + SAST_OFFSET_MS);
+  const sastYear = shifted.getUTCFullYear();
+  const sastMonth = shifted.getUTCMonth();
+  const startMs = Date.UTC(sastYear, sastMonth - monthsAgo, 1) - SAST_OFFSET_MS;
+  const endMs = Date.UTC(sastYear, sastMonth - monthsAgo + 1, 1) - SAST_OFFSET_MS;
+  return { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() };
+}
+
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+export function sastMonthLabel(monthsAgo: number): string {
+  const shifted = new Date(Date.now() + SAST_OFFSET_MS);
+  const sastYear = shifted.getUTCFullYear();
+  const sastMonth = shifted.getUTCMonth();
+  const d = new Date(Date.UTC(sastYear, sastMonth - monthsAgo, 1));
+  return MONTH_LABELS[d.getUTCMonth()];
+}
