@@ -37,7 +37,13 @@ afterAll(async () => {
   }
 }, 30000);
 
-async function seedProduct(clubId: string, tokenPrice: number, stock: number, flags: string[] = []) {
+async function seedProduct(
+  clubId: string,
+  tokenPrice: number,
+  stock: number,
+  flags: string[] = [],
+  priceTiers: { minQty: number; unitPrice: number }[] = [],
+) {
   const admin = createAdminClient();
   const { data: category, error: categoryError } = await admin
     .from("product_categories")
@@ -57,6 +63,7 @@ async function seedProduct(clubId: string, tokenPrice: number, stock: number, fl
       token_price: tokenPrice,
       sell_price: tokenPrice * 1.5,
       flags,
+      price_tiers: priceTiers,
     })
     .select()
     .single();
@@ -400,5 +407,138 @@ describe("gifting", () => {
 
     expect(order.tokenTotal).toBe(0);
     expect(order.staffEmail).toBe(data.clubA.adminEmail);
+  });
+});
+
+describe("category-pooled bulk pricing", () => {
+  const TIERS = [
+    { minQty: 10, unitPrice: 100 },
+    { minQty: 20, unitPrice: 90 },
+  ];
+
+  it("prices a single product against its own quantity when nothing else pools with it (regression)", async () => {
+    const product = await seedProduct(data.clubA.clubId, 150, 50, [], TIERS);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 5000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: product.id, qty: 10 },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.items[0].tokenPrice).toBe(100);
+    expect(order.items[0].lineTotal).toBe(1000);
+    expect(order.tokenTotal).toBe(1000);
+  });
+
+  it("pools quantities across two products in the same category to unlock a shared tier", async () => {
+    const productA = await seedProduct(data.clubA.clubId, 150, 50, [], TIERS);
+    const productB = await seedProduct(data.clubA.clubId, 150, 50, [], TIERS);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 5000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: productA.id, qty: 10 },
+      { productId: productB.id, qty: 10 },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.tokenTotal).toBe(1800);
+    for (const item of order.items) {
+      expect(item.tokenPrice).toBe(90);
+      expect(item.lineTotal).toBe(900);
+    }
+  });
+
+  it("does not pool quantities across different categories", async () => {
+    const admin = createAdminClient();
+    const productA = await seedProduct(data.clubA.clubId, 150, 50, [], TIERS);
+
+    const { data: secondCategory, error: categoryError } = await admin
+      .from("product_categories")
+      .insert({ club_id: data.clubA.clubId, name: `Other Category ${crypto.randomUUID().slice(0, 8)}` })
+      .select()
+      .single();
+    if (categoryError) throw categoryError;
+
+    const { data: productB, error: productError } = await admin
+      .from("products")
+      .insert({
+        club_id: data.clubA.clubId,
+        name: `Dispense Test Product ${crypto.randomUUID().slice(0, 8)}`,
+        category_id: secondCategory.id,
+        unit: "per 1g",
+        token_price: 150,
+        sell_price: 225,
+        flags: [],
+        price_tiers: TIERS,
+      })
+      .select()
+      .single();
+    if (productError) throw productError;
+
+    const { data: move, error: moveError } = await admin
+      .from("inventory_moves")
+      .insert({ club_id: data.clubA.clubId, product_id: productB.id, type: "PURCHASE", qty: 50 })
+      .select()
+      .single();
+    if (moveError) throw moveError;
+
+    const member = await seedMemberWithBalance(data.clubA.clubId, 5000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: productA.id, qty: 10 },
+      { productId: productB.id, qty: 10 },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    expect(order.tokenTotal).toBe(2000);
+    for (const item of order.items) {
+      expect(item.tokenPrice).toBe(100);
+    }
+
+    await admin.from("inventory_moves").delete().eq("id", move.id);
+    await admin.from("products").delete().eq("id", productB.id);
+    await admin.from("product_categories").delete().eq("id", secondCategory.id);
+  });
+
+  it("each product keeps its own tier price when pooled quantity is evaluated against different tier schedules", async () => {
+    const productA = await seedProduct(data.clubA.clubId, 150, 50, [], TIERS);
+    const productB = await seedProduct(data.clubA.clubId, 150, 50, [], [{ minQty: 15, unitPrice: 95 }]);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 5000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: productA.id, qty: 10 },
+      { productId: productB.id, qty: 10 },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    const itemA = order.items.find((i) => i.productId === productA.id)!;
+    const itemB = order.items.find((i) => i.productId === productB.id)!;
+
+    expect(itemA.tokenPrice).toBe(90);
+    expect(itemB.tokenPrice).toBe(95);
+    expect(order.tokenTotal).toBe(900 + 950);
+  });
+
+  it("gifted quantity counts toward the pooled total that unlocks a paid line's tier", async () => {
+    const giftProduct = await seedProduct(data.clubA.clubId, 150, 50, ["gift"], TIERS);
+    const paidProduct = await seedProduct(data.clubA.clubId, 150, 50, [], TIERS);
+    const member = await seedMemberWithBalance(data.clubA.clubId, 5000);
+
+    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+      { productId: giftProduct.id, qty: 10, isGift: true },
+      { productId: paidProduct.id, qty: 10 },
+    ]);
+    cleanupOrderIds.push(order.id);
+
+    const giftItem = order.items.find((i) => i.productId === giftProduct.id)!;
+    const paidItem = order.items.find((i) => i.productId === paidProduct.id)!;
+
+    expect(giftItem.tokenPrice).toBe(90);
+    expect(giftItem.lineTotal).toBe(900);
+    expect(paidItem.tokenPrice).toBe(90);
+    expect(order.tokenTotal).toBe(900);
+
+    expect(await getStock(giftProduct.id)).toBe(40);
+    expect(await getStock(paidProduct.id)).toBe(40);
   });
 });
