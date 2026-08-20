@@ -11,6 +11,7 @@ const cleanupOrderIds: string[] = [];
 const cleanupMoveIds: string[] = [];
 const cleanupProductIds: string[] = [];
 const cleanupMemberIds: string[] = [];
+const cleanupCategoryIds: string[] = [];
 
 beforeAll(async () => {
   data = await seedTenants();
@@ -28,6 +29,9 @@ afterAll(async () => {
   }
   if (cleanupProductIds.length > 0) {
     await admin.from("products").delete().in("id", cleanupProductIds);
+  }
+  if (cleanupCategoryIds.length > 0) {
+    await admin.from("product_categories").delete().in("id", cleanupCategoryIds);
   }
   if (cleanupMemberIds.length > 0) {
     await admin.from("members").delete().in("id", cleanupMemberIds);
@@ -458,6 +462,7 @@ describe("category-pooled bulk pricing", () => {
       .select()
       .single();
     if (categoryError) throw categoryError;
+    cleanupCategoryIds.push(secondCategory.id);
 
     const { data: productB, error: productError } = await admin
       .from("products")
@@ -474,6 +479,7 @@ describe("category-pooled bulk pricing", () => {
       .select()
       .single();
     if (productError) throw productError;
+    cleanupProductIds.push(productB.id);
 
     const { data: move, error: moveError } = await admin
       .from("inventory_moves")
@@ -481,23 +487,31 @@ describe("category-pooled bulk pricing", () => {
       .select()
       .single();
     if (moveError) throw moveError;
+    cleanupMoveIds.push(move.id);
 
     const member = await seedMemberWithBalance(data.clubA.clubId, 5000);
 
-    const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
-      { productId: productA.id, qty: 10 },
-      { productId: productB.id, qty: 10 },
-    ]);
-    cleanupOrderIds.push(order.id);
+    try {
+      const order = await createDispenseOrder(clubAClient, data.clubA.clubId, member.id, [
+        { productId: productA.id, qty: 10 },
+        { productId: productB.id, qty: 10 },
+      ]);
+      cleanupOrderIds.push(order.id);
 
-    expect(order.tokenTotal).toBe(2000);
-    for (const item of order.items) {
-      expect(item.tokenPrice).toBe(100);
+      expect(order.tokenTotal).toBe(2000);
+      for (const item of order.items) {
+        expect(item.tokenPrice).toBe(100);
+      }
+    } finally {
+      // Deleted immediately (not left for afterAll) so the second category
+      // doesn't linger and pollute seedProduct's unordered `.limit(1)`
+      // category lookup for the tests that run after this one. Also
+      // registered in the shared cleanup arrays above as a fallback in case
+      // this delete itself fails.
+      await admin.from("inventory_moves").delete().eq("id", move.id);
+      await admin.from("products").delete().eq("id", productB.id);
+      await admin.from("product_categories").delete().eq("id", secondCategory.id);
     }
-
-    await admin.from("inventory_moves").delete().eq("id", move.id);
-    await admin.from("products").delete().eq("id", productB.id);
-    await admin.from("product_categories").delete().eq("id", secondCategory.id);
   });
 
   it("each product keeps its own tier price when pooled quantity is evaluated against different tier schedules", async () => {
