@@ -44,9 +44,20 @@ export function DispensingPanel({
 
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
+  const pooledQtyByCategory = new Map<string, number>();
+  for (const [productId, qty] of Object.entries(cart)) {
+    const product = productById.get(productId);
+    if (!product) continue;
+    pooledQtyByCategory.set(
+      product.categoryId,
+      (pooledQtyByCategory.get(product.categoryId) ?? 0) + qty,
+    );
+  }
+
   const cartLines = Object.entries(cart).map(([productId, qty]) => {
     const product = productById.get(productId);
-    const tokenPrice = product ? effectiveUnitPrice(product.tokenPrice, product.priceTiers, qty) : 0;
+    const pooledQty = product ? (pooledQtyByCategory.get(product.categoryId) ?? qty) : qty;
+    const tokenPrice = product ? effectiveUnitPrice(product.tokenPrice, product.priceTiers, pooledQty) : 0;
     const isGift = productId in giftLines;
     const lineTotal = tokenPrice * qty;
     return {
